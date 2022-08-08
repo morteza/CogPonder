@@ -1,10 +1,20 @@
 name: CogPonder
 channels:
   - conda-forge
+  - pytorch
   - defaults
 dependencies:
   - python=3.10
   - pip
+  - ipykernel
+  - flake8
   - pip:
+    - torch
+    - torchvision
+    - torchaudio
+    - tensorflow
+    - tensorboard
+    - scikit-learn
+    - tqdm
     - pandas
     - seaborn
