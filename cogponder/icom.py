@@ -45,7 +45,7 @@ class ICOM(nn.Module):
         msg = msg.transpose(0, 1)  # reshape for linear layer
         y = self.decode(msg)
         y = y[:, -1, :]  # last time step
-        # y = y.argmax(dim=1)
+        # y = y.argmax(dim=1).float()
         return y, h
 
     def _init_h(self, batch_size):

@@ -43,7 +43,7 @@ class PonderNet(nn.Module):
       lambda_n = torch.ones((batch_size,))
     else:
       lambda_n = self.halt_node(h).squeeze()
-    
+
     return y_n, h, lambda_n
 
   def forward(self, x):
@@ -76,7 +76,7 @@ class PonderNet(nn.Module):
       p_continue = p_continue * (1 - lambda_n)  # update
 
       y_steps.append(y_n)
-      lambdas.append(lambda_n)
+      # lambdas.append(lambda_n)
       p_halts.append(p_halt)
 
       if (halt_step <= n).all():
@@ -85,18 +85,17 @@ class PonderNet(nn.Module):
     # prepare outputs of the forward pass
     halt_step_idx = halt_step.reshape(-1).to(torch.int64) - 1
     y_steps = torch.stack(y_steps).transpose(0, 1)
-    lambdas = torch.stack(lambdas).transpose(0, 1)
+    # lambdas = torch.stack(lambdas).transpose(0, 1)
 
     # FIXME p_halt is not correct
     p_halts = torch.stack(p_halts).transpose(0, 1).squeeze()
 
-    y_pred = y_steps[0, halt_step_idx].squeeze()
+    # y_pred = y_steps[0, halt_step_idx].squeeze()
 
-    return y_steps, lambdas, y_pred, p_halts, halt_step_idx
+    return y_steps, p_halts, halt_step_idx
 
 # DEBUG
 # from icom import ICOM
 # model = PonderNet(ICOM, 5, 3, 2, 100)
 # X = torch.randint(0, 5, (10, 3))
-# y_steps, _, y_pred, p_halts, halt_step = model(X)
-# print(y_steps)
+# y_steps, p_halts, halt_step = model(X)

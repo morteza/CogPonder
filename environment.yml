@@ -15,6 +15,7 @@ dependencies:
     - torchaudio
     - tensorflow
     - tensorboard
+    - torch-tb-profiler
     - scikit-learn
     - tqdm
     - pandas
