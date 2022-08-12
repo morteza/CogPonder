@@ -11,30 +11,28 @@ class ReconstructionLoss(nn.Module):
         self.loss_func = loss_func
 
     def forward(self, p, y_pred, y_true):
-        """Compute loss.
+        """Compute reconstruction loss.
         
         Args:
         ----------
         p:
-            (steps, batch_size)
+            (batch_size, steps)
         y_pred:
-            shape (steps, batch_size)
+            shape (batch_size, steps)
         y_true:
-            shape (batch_size,)
+            shape (batch_size)
 
         Returns:
         ----------
         loss : torch.Tensor
             Scalar loss.
         """
-        max_steps, _ = p.shape
+        _, max_steps = p.shape
         total_loss = p.new_tensor(0.0)
 
         for n in range(max_steps):
-            loss_per_sample = p[n] * self.loss_func(
-                y_pred[n], y_true
-            )  # (batch_size,)
-            total_loss = total_loss + loss_per_sample.mean()  # (1,)
+            step_loss = p[n] * self.loss_func(y_pred[:, n, :], y_true)  # (batch_size,)
+            total_loss = total_loss + step_loss.mean()  # (1,)
 
         return total_loss
 

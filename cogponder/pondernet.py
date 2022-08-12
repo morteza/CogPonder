@@ -53,11 +53,11 @@ class PonderNet(nn.Module):
     h = torch.zeros(1, batch_size, self.n_embeddings)
     # h = self.output_node(x, h)
 
-    p_halt = torch.zeros((batch_size, 1, 1,))
-    p_continue = torch.ones((batch_size, 1, 1,))
+    p_halt = torch.zeros(batch_size)
+    p_continue = torch.ones(batch_size)
 
-    ys = []
-    ps = []
+    y_steps = []
+    p_halts = []
     lambdas = []
 
     halt_step = torch.zeros((batch_size,)) # stopping step
@@ -72,29 +72,31 @@ class PonderNet(nn.Module):
         _halt_step_dist = torch.distributions.Geometric(lambda_n / 5)
         halt_step = torch.maximum(_halt_step_dist.sample(), halt_step)
 
-      p_halt = p_continue * lambda_n # p_halt = (1-p)p
-      p_continue = p_continue * (1 - lambda_n) # update
+      p_halt = p_continue * lambda_n  # p_halt = (1-p)p
+      p_continue = p_continue * (1 - lambda_n)  # update
 
-      ys.append(y_n)
+      y_steps.append(y_n)
       lambdas.append(lambda_n)
-      ps.append(p_halt)
+      p_halts.append(p_halt)
 
       if (halt_step <= n).all():
         break
 
     # prepare outputs of the forward pass
     halt_step_idx = halt_step.reshape(-1).to(torch.int64) - 1
-    ys = torch.stack(ys).transpose(0, 1)
+    y_steps = torch.stack(y_steps).transpose(0, 1)
     lambdas = torch.stack(lambdas).transpose(0, 1)
 
     # FIXME p_halt is not correct
-    p_halts = torch.stack(ps).transpose(0, 1).squeeze()
+    p_halts = torch.stack(p_halts).transpose(0, 1).squeeze()
 
-    y = ys[0, halt_step_idx].squeeze()
+    y_pred = y_steps[0, halt_step_idx].squeeze()
 
-    return ys, lambdas, y, p_halts, halt_step_idx
+    return y_steps, lambdas, y_pred, p_halts, halt_step_idx
 
 # DEBUG
-# from .icom import ICOM
-# model = PonderNet(ICOM, n_stimuli+1, n_stimuli, 2, 100)
-# _, _, y_pred, _, halt_steps = model(X)
+# from icom import ICOM
+# model = PonderNet(ICOM, 5, 3, 2, 100)
+# X = torch.randint(0, 5, (10, 3))
+# y_steps, _, y_pred, p_halts, halt_step = model(X)
+# print(y_steps)
