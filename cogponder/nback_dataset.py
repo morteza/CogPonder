@@ -66,7 +66,7 @@ class NBackDataset(Dataset):
                 shape: (n_subjects, n_trials - n_back, n_back)
             y: target labels
                 shape: (n_subjects, n_trials - n_back)
-            accuracies: accuracy of each trial
+            matches: whether a trial is a match or not
                 shape: (n_subjects, n_trials - n_back)
             response_times: response time of each trial
                 shape: (n_subjects, n_trials - n_back)
@@ -75,42 +75,37 @@ class NBackDataset(Dataset):
         # random stimuli
         X = torch.randint(low=1, high=n_stimuli + 1, size=(n_subjects, n_trials))
 
-        # response accuracy
-        _min_accuracy, _max_accuracy = 0.2, 1.0
-        subject_accuracies = torch.rand(n_subjects)
-        subject_accuracies = subject_accuracies * (_max_accuracy - _min_accuracy)
-        subject_accuracies = subject_accuracies + _min_accuracy
-        subject_accuracies = torch.round(subject_accuracies * n_trials) / n_trials
+        # response (either matched or not-matched)
+        _min_matched, _max_matched = 0.2, 1.0
+        subject_matches = torch.rand(n_subjects)
+        subject_matches = subject_matches * (_max_matched - _min_matched)
+        subject_matches = subject_matches + _min_matched
+        subject_matches = torch.round(subject_matches * n_trials) / n_trials
 
-        n_corrects = (subject_accuracies * n_trials)
+        n_matches = (subject_matches * n_trials)
 
-        accuracies = []
+        matches = []
 
         for subj in range(n_subjects):
-            n_subj_corrects = int(n_corrects[subj].item())
-            correct_trials = torch.randperm(n_trials)[:n_subj_corrects]
-            trial_accuracies = torch.zeros(n_trials).scatter_(0, correct_trials, 1)
-            accuracies.append(trial_accuracies)
+            n_subj_matches = n_matches[subj].int().item()
+            match_trials = torch.randperm(n_trials)[:n_subj_matches]
+            match_trials = torch.zeros(n_trials).scatter_(0, match_trials, 1)
+            matches.append(match_trials)
 
-        accuracies = torch.stack(accuracies)
+        matches = torch.stack(matches)
 
-        # generate correct responses and fill the rest with incorrect ones
-        y = torch.where(accuracies == 1, X, (X + 1) % (n_stimuli + 1))
+        y = matches
+        # ALT: generate correct responses and fill the rest with incorrect ones
+        # y = torch.where(y == 1, X, (X + 1) % (n_stimuli + 1))
 
         # response time
-        # TODO move rate (.5) to hyperparameters
+        # TODO move rate (.5) to hyper-parameters
         rt_dist = torch.distributions.exponential.Exponential(.5)
-        response_times = rt_dist.sample(accuracies.shape)
+        response_times = rt_dist.sample(y.shape)
 
         X = X.unfold(1, n_back + 1, 1)  # sliding window of size n_back
 
-        if n_subjects == 1:
-            X = X.squeeze()
-            y = y.squeeze()
-            accuracies = trial_accuracies.squeeze()
-            response_times = response_times.squeeze()
-
-        return X, y[:, n_back:], accuracies[:, n_back:], response_times[:, n_back:]
+        return X, y[:, n_back:], matches[:, n_back:], response_times[:, n_back:]
 
 
 # DEBUG
