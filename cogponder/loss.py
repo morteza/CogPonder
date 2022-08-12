@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 
 class ReconstructionLoss(nn.Module):
@@ -16,7 +17,7 @@ class ReconstructionLoss(nn.Module):
         Args:
         ----------
         p:
-            (batch_size, steps)
+            shape (batch_size, steps)
         y_pred:
             shape (batch_size, steps)
         y_true:
@@ -31,7 +32,8 @@ class ReconstructionLoss(nn.Module):
         total_loss = p.new_tensor(0.0)
 
         for n in range(max_steps):
-            step_loss = p[n] * self.loss_func(y_steps[:, n, 1], y_true)  # (batch_size,)
+            y_n = y_steps[:, n, 1]
+            step_loss = p[n] * self.loss_func(y_n, y_true)  # (batch_size,)
             total_loss = total_loss + step_loss.mean()  # (1,)
 
         return total_loss
@@ -48,9 +50,10 @@ class RegularizationLoss(nn.Module):
     def __init__(self, lambda_p, max_steps=20):
         super().__init__()
 
+        self.max_steps = max_steps
         self.p_g = torch.zeros((max_steps,))
-        not_halted = 1.0
 
+        not_halted = 1.0
         for k in range(max_steps):
             self.p_g[k] = not_halted * lambda_p
             not_halted = not_halted * (1 - lambda_p)
@@ -58,7 +61,7 @@ class RegularizationLoss(nn.Module):
         # self.register_buffer('p_g', p_g)
         self.kl_div = nn.KLDivLoss(reduction='batchmean')
 
-    def forward(self, p):
+    def forward(self, p, response_times):
         """Compute reg_loss.
 
         Args:
@@ -67,8 +70,17 @@ class RegularizationLoss(nn.Module):
             probability of halting. Shape (steps, batch_size).
         """
 
-        steps, batch_size = p.shape
-        # p = p.transpose(0, 1)  # (batch_size, steps)
-        p_g_batch = self.p_g[:steps,].expand_as(p)  # (batch_size, steps)
+        steps, _ = p.shape
 
-        return self.kl_div(p.log(), p_g_batch)
+        # build an empirical RT distribution
+        p_rt = torch.zeros((self.max_steps,))
+        for rt in response_times:
+            p_rt[rt.long() % self.max_steps] += 1
+        p_rt = F.normalize(p_rt, p=1, dim=0)
+
+        # REMOVE: geometric P_G (from PonderNet paper)
+        # p_g_batch = self.p_g[:steps, ].expand_as(p)  # (batch_size, steps)
+        # return self.kl_div(p.log(), p_g_batch)
+
+        p_rt_batch = p_rt[:steps, ].expand_as(p)  # (batch_size, steps)
+        return self.kl_div(p.log(), p_rt_batch)

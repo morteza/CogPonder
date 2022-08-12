@@ -103,6 +103,10 @@ class NBackDataset(Dataset):
         rt_dist = torch.distributions.exponential.Exponential(.5)
         response_times = rt_dist.sample(y.shape)
 
+        # convert RTs to steps; time resolution is 100ms
+        # TODO move time resolution (100ms) to hyper-parameters
+        torch.round(response_times * 1000 / 10)
+
         X = X.unfold(1, n_back + 1, 1)  # sliding window of size n_back
 
         return X, y[:, n_back:], matches[:, n_back:], response_times[:, n_back:]
