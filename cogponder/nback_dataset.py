@@ -98,7 +98,9 @@ class NBackDataset(Dataset):
         y = torch.where(accuracies == 1, X, (X + 1) % (n_stimuli + 1))
 
         # response time
-        response_times = np.random.exponential(.5, size=accuracies.shape)
+        # TODO move rate (.5) to hyperparameters
+        rt_dist = torch.distributions.exponential.Exponential(.5)
+        response_times = rt_dist.sample(accuracies.shape)
 
         X = X.unfold(1, n_back + 1, 1)  # sliding window of size n_back
 
