@@ -61,7 +61,7 @@ class RegularizationLoss(nn.Module):
         # self.register_buffer('p_g', p_g)
         self.kl_div = nn.KLDivLoss(reduction='batchmean')
 
-    def forward(self, p, response_times):
+    def forward(self, p, responses, response_times):
         """Compute reg_loss.
 
         Args:
