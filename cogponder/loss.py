@@ -51,10 +51,10 @@ class RegularizationLoss(nn.Module):
         super().__init__()
 
         self.max_steps = max_steps
-        self.p_g = torch.zeros((max_steps,))
+        self.p_g = torch.zeros((self.max_steps,))
 
         not_halted = 1.0
-        for k in range(max_steps):
+        for k in range(self.max_steps):
             self.p_g[k] = not_halted * lambda_p
             not_halted = not_halted * (1 - lambda_p)
 

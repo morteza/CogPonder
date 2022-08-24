@@ -34,7 +34,7 @@ class NBackDataset(Dataset):
 
         # Generate the mock data
         mock_data = self._generate_mock_data(n_subjects, n_trials, n_stimuli, n_back)
-        self.X, self.responses, self.matches, self.response_times = mock_data
+        self.X, self.responses, self.targets, self.response_times = mock_data
 
     def __len__(self):
         """Get the number of samples.
@@ -47,7 +47,7 @@ class NBackDataset(Dataset):
 
         return (self.X[idx, :],
                 self.responses[idx],
-                self.matches[idx],
+                self.targets[idx],
                 self.response_times[idx, :]
         )
 
@@ -67,7 +67,7 @@ class NBackDataset(Dataset):
                 shape: (n_subjects, n_trials - n_back, n_back)
             responses: target labels, either 0 or 1
                 shape: (n_subjects, n_trials - n_back)
-            matches: whether a trial was a match or not
+            targets: whether a trial was a match or not
                 shape: (n_subjects, n_trials - n_back)
             response_times: response time of each trial
                 shape: (n_subjects, n_trials - n_back)
@@ -83,27 +83,27 @@ class NBackDataset(Dataset):
         subject_responses = subject_responses + _min_matched
         subject_responses = torch.round(subject_responses * n_trials) / n_trials
 
-        n_matches = (subject_responses * n_trials)
+        n_targets = (subject_responses * n_trials)
 
         responses = []
         for subj in range(n_subjects):
-            n_subj_matches = n_matches[subj].int().item()
-            match_trials = torch.randperm(n_trials)[:n_subj_matches]
+            n_subj_targets = n_targets[subj].int().item()
+            match_trials = torch.randperm(n_trials)[:n_subj_targets]
             match_trials = torch.zeros(n_trials).scatter_(0, match_trials, 1)
             responses.append(match_trials)
         responses = torch.stack(responses)
 
         X = X.unfold(1, n_back + 1, 1)  # sliding window of size n_back
 
-        matches = []
+        targets = []
         for subj_x in X:
-            subj_matches = torch.stack(
+            subj_targets = torch.stack(
                 [x[-1] == x[-1 - n_back] for x in subj_x.unbind(dim=0)]
             )
-            matches.append(subj_matches)
-        matches = torch.stack(matches)
+            targets.append(subj_targets)
+        targets = torch.stack(targets)
 
-        # y = matches
+        # y = targets
         # ALT: generate correct responses and fill the rest with incorrect ones
         # y = torch.where(y == 1, X, (X + 1) % (n_stimuli + 1))
 
@@ -116,7 +116,7 @@ class NBackDataset(Dataset):
         # TODO move time resolution (100ms) to hyper-parameters
         torch.round(response_times * 1000 / 10)
 
-        return X, responses[:, n_back:], matches, response_times[:, n_back:]
+        return X, responses[:, n_back:], targets, response_times[:, n_back:]
 
 
 # DEBUG

@@ -13,7 +13,7 @@ class PonderNet(nn.Module):
 
     self.output_node = output_cls(n_inputs, n_embeddings, n_outputs)
 
-    # the halting node predicts the probability of halting conditional on not having halted before. It exactly computes the overall probability of halting at each step as a geometric distribution.
+    # the halting node predicts the probability of halting conditional on not having halted before. It exactly computes overall probability of halting at each step as a geometric distribution.
     self.halt_node = nn.Sequential(
       nn.Linear(n_embeddings, 1),
       nn.Sigmoid()

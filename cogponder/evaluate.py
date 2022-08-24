@@ -14,6 +14,7 @@ def evaluate(
     dataset,
     optimizer,
     n_epochs=1000,
+    max_steps=20,
     logs=SummaryWriter()
 ):
 
@@ -27,7 +28,7 @@ def evaluate(
     X_test, r_test, y_test, rt_test = dataset[test_subset.indices]
 
     loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
-    loss_reg_fn = RegularizationLoss(lambda_p=.5, max_steps=20)
+    loss_reg_fn = RegularizationLoss(lambda_p=.5, max_steps=max_steps)
     loss_beta = .2
 
     for epoch in tqdm(range(n_epochs), desc='Epochs'):

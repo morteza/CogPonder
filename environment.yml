@@ -1,4 +1,4 @@
-name: CogPonder
+name: ponder
 channels:
   - conda-forge
   - pytorch
@@ -13,8 +13,8 @@ dependencies:
     - torch
     - torchvision
     - torchaudio
-    - tensorflow
-    - tensorboard
+    # - tensorflow
+    # - tensorboard
     - torch-tb-profiler
     - scikit-learn
     - tqdm
