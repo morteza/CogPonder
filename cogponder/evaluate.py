@@ -1,9 +1,8 @@
 import torch
 from torch import nn
-from torch.utils.data import random_split
+from torch.utils.data import random_split, DataLoader
 from sklearn.metrics import accuracy_score
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
 from tqdm.auto import tqdm
 
 from .loss import ReconstructionLoss, RegularizationLoss
@@ -14,6 +13,7 @@ def evaluate(
     dataset,
     optimizer,
     n_epochs=1000,
+    batch_size=4,
     max_steps=20,
     logs=SummaryWriter()
 ):
@@ -23,9 +23,8 @@ def evaluate(
     test_size = len(dataset) - train_size
 
     train_subset, test_subset = random_split(dataset, lengths=(train_size, test_size))
-
-    X_train, r_train, y_train, rt_train = dataset[train_subset.indices]
-    X_test, r_test, y_test, rt_test = dataset[test_subset.indices]
+    X_train, y_train, r_train, rt_train = dataset[train_subset.indices]
+    X_test, y_test, r_test, rt_test = dataset[test_subset.indices]
 
     loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
     loss_reg_fn = RegularizationLoss(lambda_p=.5, max_steps=max_steps)
@@ -33,25 +32,33 @@ def evaluate(
 
     for epoch in tqdm(range(n_epochs), desc='Epochs'):
 
+        # running_loss = 0.0
+        # for X_batch, y_batch, r_batch, rt_batch in DataLoader(train_subset,
+        #                                                       batch_size=batch_size,
+        #                                                       shuffle=True):
+
         model.train()
         y_steps, p_halt, halt_step = model(X_train)
 
         loss_rec = loss_rec_fn(p_halt, y_steps, y_train)
         loss_reg = loss_reg_fn(p_halt, r_train, rt_train)
         loss = loss_rec + loss_beta * loss_reg
+        # running_loss += loss.item()
 
+        # logs
         logs.add_scalar('loss/rec_train', loss_rec, epoch)
         logs.add_scalar('loss/reg_train', loss_reg, epoch)
         logs.add_scalar('loss/train', loss, epoch)
 
+        # forward + backward + optimize
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
         y_pred = y_steps.detach()[0, halt_step].argmax(dim=1)
-        train_accuracy = accuracy_score(y_pred, y_train)
+        batch_accuracy = accuracy_score(y_pred, y_train)
 
-        logs.add_scalar('accuracy/train', train_accuracy, epoch)  
+        logs.add_scalar('accuracy/train', batch_accuracy, epoch)
 
         model.eval()
         with torch.no_grad():

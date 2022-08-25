@@ -33,8 +33,8 @@ class ReconstructionLoss(nn.Module):
 
         for n in range(max_steps):
             y_n = y_steps[:, n, 1]
-            step_loss = p[n] * self.loss_func(y_n, y_true)  # (batch_size,)
-            total_loss = total_loss + step_loss.mean()  # (1,)
+            step_loss = p[:, n] * self.loss_func(y_n, y_true)  # (batch_size,)
+            total_loss += step_loss.mean()  # (1,)
 
         return total_loss
 
@@ -47,7 +47,7 @@ class RegularizationLoss(nn.Module):
     max_steps : int
     """
 
-    def __init__(self, lambda_p, max_steps=20):
+    def __init__(self, lambda_p, max_steps):
         super().__init__()
 
         self.max_steps = max_steps
@@ -61,7 +61,7 @@ class RegularizationLoss(nn.Module):
         # self.register_buffer('p_g', p_g)
         self.kl_div = nn.KLDivLoss(reduction='batchmean')
 
-    def forward(self, p, responses, response_times):
+    def forward(self, p_halt, responses, response_times):
         """Compute reg_loss.
 
         Args:
@@ -70,7 +70,7 @@ class RegularizationLoss(nn.Module):
             probability of halting. Shape (steps, batch_size).
         """
 
-        steps, _ = p.shape
+        steps, _ = p_halt.shape
 
         # build an empirical RT distribution
         p_rt = torch.zeros((self.max_steps,))
@@ -82,5 +82,5 @@ class RegularizationLoss(nn.Module):
         # p_g_batch = self.p_g[:steps, ].expand_as(p)  # (batch_size, steps)
         # return self.kl_div(p.log(), p_g_batch)
 
-        p_rt_batch = p_rt[:steps, ].expand_as(p)  # (batch_size, steps)
-        return self.kl_div(p.log(), p_rt_batch)
+        p_rt_batch = p_rt[:steps, ].expand_as(p_halt)  # (batch_size, steps)
+        return self.kl_div(p_halt.log(), p_rt_batch)

@@ -116,7 +116,7 @@ class NBackDataset(Dataset):
         # TODO move time resolution (100ms) to hyper-parameters
         torch.round(response_times * 1000 / 10)
 
-        return X, responses[:, n_back:], targets, response_times[:, n_back:]
+        return X, targets, responses[:, n_back:], response_times[:, n_back:]
 
 
 # DEBUG
