@@ -9,6 +9,7 @@ dependencies:
   - ipykernel
   - flake8
   - ipywidgets
+  - pytest
   - pip:
     - torch
     - torchvision
