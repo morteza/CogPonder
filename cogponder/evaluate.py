@@ -3,7 +3,7 @@ from torch import nn
 from torch.utils.data import random_split, DataLoader
 from sklearn.metrics import accuracy_score
 from torch.utils.tensorboard import SummaryWriter
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from .loss import ReconstructionLoss, RegularizationLoss
 
@@ -77,3 +77,5 @@ def evaluate(
             test_accuracy = accuracy_score(y_pred, y_test)
 
             logs.add_scalar('accuracy/test', test_accuracy, epoch)
+
+    return model, X_train, X_test, y_train, y_test, r_train, r_test, rt_train, rt_test

@@ -60,7 +60,7 @@ class PonderNet(nn.Module):
     p_halts = []
     lambdas = []
 
-    halt_step = torch.zeros((batch_size,)) # stopping step
+    halt_step = torch.zeros((batch_size,))  # stopping step
 
     for n in range(1, self.max_steps + 1):
 
@@ -69,7 +69,7 @@ class PonderNet(nn.Module):
       if n == self.max_steps:
         halt_step = torch.empty((batch_size,)).fill_(n)
       else:
-        _halt_step_dist = torch.distributions.Geometric(lambda_n / 5)
+        _halt_step_dist = torch.distributions.Geometric(lambda_n)
         halt_step = torch.maximum(_halt_step_dist.sample(), halt_step)
 
       p_halt = p_continue * lambda_n  # p_halt = (1-p)p

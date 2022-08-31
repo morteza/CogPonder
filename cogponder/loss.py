@@ -73,14 +73,14 @@ class RegularizationLoss(nn.Module):
         steps, _ = p_halt.shape
 
         # build an empirical RT distribution
-        p_rt = torch.zeros((self.max_steps,))
+        p_rt = torch.zeros((steps,))
         for rt in response_times:
-            p_rt[rt.long() % self.max_steps] += 1
-        p_rt = F.normalize(p_rt, p=1, dim=0).reshape(-1,1)
+            p_rt[rt.long() % steps] += 1
+        p_rt = F.normalize(p_rt, p=1, dim=0)
 
         # REMOVE: geometric P_G (from PonderNet paper)
         # p_g_batch = self.p_g[:steps, ].expand_as(p)  # (batch_size, steps)
         # return self.kl_div(p.log(), p_g_batch)
 
-        p_rt_batch = p_rt[:steps].expand_as(p_halt)  # (batch_size, steps)
+        p_rt_batch = p_rt[:steps].expand(p_halt.shape[1], steps).T  # (batch_size, steps)
         return self.kl_div(p_halt.log(), p_rt_batch)
