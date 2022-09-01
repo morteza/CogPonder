@@ -14,7 +14,9 @@ def evaluate(
     optimizer,
     n_epochs=1000,
     batch_size=4,
-    max_steps=20,
+    max_steps=100,
+    loss_beta=.5,
+    lambda_p=.5,
     logs=SummaryWriter()
 ):
 
@@ -27,8 +29,7 @@ def evaluate(
     X_test, y_test, r_test, rt_test = dataset[test_subset.indices]
 
     loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
-    loss_reg_fn = RegularizationLoss(lambda_p=.5, max_steps=max_steps)
-    loss_beta = .2
+    loss_reg_fn = RegularizationLoss(lambda_p=lambda_p, max_steps=max_steps)
 
     for epoch in tqdm(range(n_epochs), desc='Epochs'):
 
@@ -63,11 +64,6 @@ def evaluate(
         model.eval()
         with torch.no_grad():
             y_steps, p_halt, halt_step = model(X_test)
-
-            loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
-            loss_reg_fn = RegularizationLoss(lambda_p=.5, max_steps=max_steps)
-            loss_beta = .2
-
             loss_rec = loss_rec_fn(p_halt, y_steps, y_test)
             loss_reg = loss_reg_fn(p_halt, r_test, rt_test)
             loss = loss_rec + loss_beta * loss_reg

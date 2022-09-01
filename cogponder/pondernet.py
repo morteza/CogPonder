@@ -13,13 +13,17 @@ class PonderNet(nn.Module):
 
     self.output_node = output_cls(n_inputs, n_embeddings, n_outputs)
 
-    # the halting node predicts the probability of halting conditional on not having halted before. It exactly computes overall probability of halting at each step as a geometric distribution.
+    # the halting node predicts the probability of halting conditional on not having
+    # halted before. It exactly computes overall probability of halting at each step as
+    # a geometric distribution.
     self.halt_node = nn.Sequential(
-      nn.Linear(n_embeddings, 1),
-      nn.Sigmoid()
+        nn.Linear(n_embeddings, 1),
+        nn.Sigmoid()
     )
 
-    # loss:  we don’t regularize PonderNet to explicitly minimize the number of computing steps, but incentivize exploration instead. The pressure of using computation efficiently happens naturally as a form of Occam’s razor.
+    # loss:  we don’t regularize PonderNet to explicitly minimize the number of computing
+    # steps, but incentivize exploration instead. The pressure of using computation
+    # efficiently happens naturally as a form of Occam’s razor.
 
   def step(self, x, h, n):
     """A single pondering step.

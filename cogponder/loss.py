@@ -70,17 +70,19 @@ class RegularizationLoss(nn.Module):
             probability of halting. Shape (steps, batch_size).
         """
 
-        steps, _ = p_halt.shape
+        _, steps = p_halt.shape
 
         # build an empirical RT distribution
-        p_rt = torch.zeros((steps,))
+        p_rt = torch.zeros((self.max_steps,))
         for rt in response_times:
-            p_rt[rt.long() % steps] += 1
+            p_rt[rt.int()] += 1
         p_rt = F.normalize(p_rt, p=1, dim=0)
 
         # REMOVE: geometric P_G (from PonderNet paper)
-        # p_g_batch = self.p_g[:steps, ].expand_as(p)  # (batch_size, steps)
-        # return self.kl_div(p.log(), p_g_batch)
+        p_g_batch = self.p_g[:steps, ].expand_as(p_halt)  # (batch_size, steps)
+        p_g_loss = self.kl_div(p_halt.log(), p_g_batch)
 
-        p_rt_batch = p_rt[:steps].expand(p_halt.shape[1], steps).T  # (batch_size, steps)
-        return self.kl_div(p_halt.log(), p_rt_batch)
+        p_rt_batch = p_rt[:steps].expand_as(p_halt)  # (batch_size, steps)
+        rt_loss = self.kl_div(p_halt.log(), p_rt_batch)
+
+        return rt_loss + p_g_loss
