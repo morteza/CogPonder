@@ -17,16 +17,22 @@ def evaluate(
     max_steps=100,
     loss_beta=.5,
     lambda_p=.5,
-    logs=SummaryWriter()
+    logs=SummaryWriter(),
+    randomized_split=False,
 ):
 
     # split params
     train_size = int(len(dataset) * .8)
     test_size = len(dataset) - train_size
 
-    train_subset, test_subset = random_split(dataset, lengths=(train_size, test_size))
-    X_train, y_train, r_train, rt_train = dataset[train_subset.indices]
-    X_test, y_test, r_test, rt_test = dataset[test_subset.indices]
+    if randomized_split:
+        train_subset, test_subset = random_split(dataset, lengths=(train_size, test_size))
+        X_train, y_train, r_train, rt_train = dataset[train_subset.indices]
+        X_test, y_test, r_test, rt_test = dataset[test_subset.indices]
+    else:
+        X_train, y_train, r_train, rt_train = dataset[:train_size]
+        X_test, y_test, r_test, rt_test = dataset[train_size:]
+
 
     loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
     loss_reg_fn = RegularizationLoss(lambda_p=lambda_p, max_steps=max_steps)

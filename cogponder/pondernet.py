@@ -93,6 +93,7 @@ class PonderNet(nn.Module):
 
     # FIXME p_halt is not correct
     p_halts = torch.stack(p_halts).transpose(0, 1).squeeze()
+    p_halts[:, -1] = 1 - p_halts[:, :-1].sum(dim=1)
 
     # y_pred = y_steps[0, halt_step_idx].squeeze()
 

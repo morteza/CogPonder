@@ -1,2 +1,2 @@
 # CogPonder
-Cognitive Pondering: A joint model of speed and accuracy.
+Cognitive Pondering: A joint model of speed and accuracy inn cognitive tests.
