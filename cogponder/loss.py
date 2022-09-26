@@ -29,7 +29,6 @@ class ReconstructionLoss(nn.Module):
             Scalar loss.
         """
 
-        print(p_halt.shape)
         _, max_steps = p_halt.shape
         total_loss = p_halt.new_tensor(0.0)
 
