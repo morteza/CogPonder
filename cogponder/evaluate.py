@@ -33,7 +33,6 @@ def evaluate(
         X_train, y_train, r_train, rt_train = dataset[:train_size]
         X_test, y_test, r_test, rt_test = dataset[train_size:]
 
-
     loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
     loss_reg_fn = RegularizationLoss(lambda_p=lambda_p, max_steps=max_steps)
 
@@ -46,6 +45,7 @@ def evaluate(
 
         model.train()
         y_steps, p_halt, halt_step = model(X_train)
+        halt_step_idx = halt_step.reshape(-1).to(torch.int64) - 1
 
         loss_rec = loss_rec_fn(p_halt, y_steps, y_train)
         loss_reg = loss_reg_fn(p_halt, r_train, rt_train)
@@ -62,7 +62,7 @@ def evaluate(
         loss.backward()
         optimizer.step()
 
-        y_pred = y_steps.detach()[0, halt_step].argmax(dim=1)
+        y_pred = y_steps.detach()[0, halt_step_idx].argmax(dim=1)
         batch_accuracy = accuracy_score(y_pred, y_train)
 
         logs.add_scalar('accuracy/train', batch_accuracy, epoch)
@@ -70,12 +70,14 @@ def evaluate(
         model.eval()
         with torch.no_grad():
             y_steps, p_halt, halt_step = model(X_test)
+            halt_step_idx = halt_step.reshape(-1).to(torch.int64) - 1
+
             loss_rec = loss_rec_fn(p_halt, y_steps, y_test)
             loss_reg = loss_reg_fn(p_halt, r_test, rt_test)
             loss = loss_rec + loss_beta * loss_reg
             logs.add_scalar('loss/test', loss.detach(), epoch)
 
-            y_pred = y_steps.detach()[0, halt_step].argmax(dim=1)
+            y_pred = y_steps.detach()[0, halt_step_idx].argmax(dim=1)
             test_accuracy = accuracy_score(y_pred, y_test)
 
             logs.add_scalar('accuracy/test', test_accuracy, epoch)

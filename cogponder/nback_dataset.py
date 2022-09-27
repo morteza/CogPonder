@@ -109,7 +109,7 @@ class NBackDataset(Dataset):
 
         # response time
         # TODO move rate (.5) to hyper-parameters
-        rt_dist = torch.distributions.exponential.Exponential(.1)
+        rt_dist = torch.distributions.exponential.Exponential(.5)
         response_times = rt_dist.sample(responses.shape) + 1.0
 
         # convert RTs to steps; time resolution is 100ms

@@ -1,3 +1,8 @@
+# from the PonderNet paper
+# We don’t regularize PonderNet to explicitly minimize the number of computing
+# steps, but incentivize exploration instead. The pressure of using computation
+# efficiently happens naturally as a form of Occam’s razor.
+
 import torch
 from torch import nn
 import torch.nn.functional as F
