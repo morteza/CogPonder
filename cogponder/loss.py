@@ -102,4 +102,4 @@ class RegularizationLoss(nn.Module):
         p_rt_empirical = p_rt_empirical[:steps].expand_as(p_halt)  # (batch_size, steps)
         rt_loss = self.kl_div(p_halt, p_rt_empirical)
 
-        return rt_loss + p_g_loss
+        return rt_loss

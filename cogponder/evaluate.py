@@ -15,7 +15,7 @@ def evaluate(
     n_epochs=1000,
     batch_size=4,
     max_steps=100,
-    loss_beta=.3,
+    loss_beta=.2,
     lambda_p=.5,
     logs=SummaryWriter(),
     randomized_split=False,
