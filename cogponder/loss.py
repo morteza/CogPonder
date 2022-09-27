@@ -18,7 +18,7 @@ class ReconstructionLoss(nn.Module):
 
     def forward(self, p_halt, y_steps, y_true):
         """Compute reconstruction loss.
-        
+
         Args:
         ----------
         p_halt : torch.Tensor
@@ -85,6 +85,8 @@ class RegularizationLoss(nn.Module):
         # component 1.  KL between p_halt and geometric distribution (p_g)
         p_g_batch = self.p_g[:steps, ].expand_as(p_halt)  # (batch_size, steps)
         p_g_loss = self.kl_div(p_halt, p_g_batch)
+
+        # Original PonderNet: return p_g_loss
 
         # component 2. KL between p_halt and empirical RT distribution
         p_rt_empirical = torch.zeros((self.max_steps,))

@@ -58,17 +58,17 @@ class PonderNet(nn.Module):
     y_steps = []
     p_halts = []
 
-    halt_step = torch.zeros((batch_size,))  # stopping step
+    halt_steps = torch.zeros((batch_size,))  # stopping step
 
     for n in range(1, self.max_steps + 1):
 
       y_n, h, lambda_n = self.step(x, h, n)
 
       if n == self.max_steps:
-        halt_step = torch.empty((batch_size,)).fill_(n).int()
+        halt_steps = torch.empty((batch_size,)).fill_(n).int()
       else:
         _halt_step_dist = torch.distributions.Geometric(lambda_n)
-        halt_step = torch.maximum(_halt_step_dist.sample(), halt_step).int()
+        halt_steps = torch.maximum(_halt_step_dist.sample(), halt_steps).int()
 
       p_halt = p_continue * lambda_n  # p_halt = ...(1-p)p
       p_continue = p_continue * (1 - lambda_n)  # update p_continue = ...(1-p)(1-p)
@@ -76,7 +76,7 @@ class PonderNet(nn.Module):
       y_steps.append(y_n)
       p_halts.append(p_halt)
 
-      if (halt_step <= n).all():
+      if (halt_steps <= n).all():
         break
 
     # prepare outputs of the forward pass
@@ -89,7 +89,7 @@ class PonderNet(nn.Module):
     # halt_step_idx = halt_step.reshape(-1).to(torch.int64) - 1
     # y_pred = y_steps[0, halt_step_idx].squeeze()
 
-    return y_steps, p_halts, halt_step
+    return y_steps, p_halts, halt_steps
 
 # DEBUG
 # from icom import ICOM
