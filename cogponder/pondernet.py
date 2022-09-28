@@ -80,14 +80,14 @@ class PonderNet(nn.Module):
         break
 
     # prepare outputs of the forward pass
-    y_steps = torch.stack(y_steps).transpose(0, 1)
-    p_halts = torch.stack(p_halts).transpose(0, 1)
+    y_steps = torch.stack(y_steps).transpose(0, 1)  # -> (batch,step)
+    p_halts = torch.stack(p_halts).transpose(0, 1)  # -> (batch,step)
 
     # the probability of halting at all the steps sums to 1
-    p_halts[:, -1] = 1 - p_halts[:, :-1].sum(dim=1)
-
-    # halt_step_idx = halt_step.reshape(-1).to(torch.int64) - 1
-    # y_pred = y_steps[0, halt_step_idx].squeeze()
+    for i in range(batch_size):
+      halt_step_idx = halt_steps[i] - 1
+      p_halts[i, halt_step_idx:] = 0.0
+      p_halts[i, halt_step_idx] = 1 - p_halts[i, :halt_step_idx].sum()
 
     return y_steps, p_halts, halt_steps
 
