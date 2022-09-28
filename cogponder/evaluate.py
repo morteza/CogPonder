@@ -44,11 +44,11 @@ def evaluate(
         #                                                       shuffle=True):
 
         model.train()
-        y_steps, p_halt, halt_step = model(X_train)
-        halt_step_idx = halt_step.reshape(-1).to(torch.int64) - 1
+        y_steps, p_halt, halt_steps = model(X_train)
+        halt_steps_idx = halt_steps.reshape(-1).to(torch.int64) - 1
 
         loss_rec = loss_rec_fn(p_halt, y_steps, y_train)
-        loss_reg = loss_reg_fn(p_halt, r_train, rt_train)
+        loss_reg = loss_reg_fn(p_halt, halt_steps, r_train, rt_train)
         loss = loss_rec + loss_beta * loss_reg
         # running_loss += loss.item()
 
@@ -62,22 +62,22 @@ def evaluate(
         loss.backward()
         optimizer.step()
 
-        y_pred = y_steps.detach()[0, halt_step_idx].argmax(dim=1)
+        y_pred = y_steps.detach()[0, halt_steps_idx].argmax(dim=1)
         batch_accuracy = accuracy_score(y_pred, y_train)
 
         logs.add_scalar('accuracy/train', batch_accuracy, epoch)
 
         model.eval()
         with torch.no_grad():
-            y_steps, p_halt, halt_step = model(X_test)
-            halt_step_idx = halt_step.reshape(-1).to(torch.int64) - 1
+            y_steps, p_halt, halt_steps = model(X_test)
+            halt_steps_idx = halt_steps.reshape(-1).to(torch.int64) - 1
 
             loss_rec = loss_rec_fn(p_halt, y_steps, y_test)
-            loss_reg = loss_reg_fn(p_halt, r_test, rt_test)
+            loss_reg = loss_reg_fn(p_halt, halt_steps, r_test, rt_test)
             loss = loss_rec + loss_beta * loss_reg
             logs.add_scalar('loss/test', loss.detach(), epoch)
 
-            y_pred = y_steps.detach()[0, halt_step_idx].argmax(dim=1)
+            y_pred = y_steps.detach()[0, halt_steps_idx].argmax(dim=1)
             test_accuracy = accuracy_score(y_pred, y_test)
 
             logs.add_scalar('accuracy/test', test_accuracy, epoch)

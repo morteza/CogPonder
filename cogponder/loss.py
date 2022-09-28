@@ -69,37 +69,51 @@ class RegularizationLoss(nn.Module):
             not_halted = not_halted * (1 - lambda_p)
         self.register_buffer('p_g', p_g)  # persist p_g
 
-    def forward(self, p_halt, responses, response_times):
+    def forward(self, p_halts, halt_steps, responses, response_times):
         """Compute reg_loss.
+
+        Notes: `reg_loss = KL(p_halts || p_g) + KL(halt_steps || p_rt_empirical)`
 
         Args:
         ----------
-        p_halt : torch.Tensor
+        p_halts : torch.Tensor
             probability of halting. Shape (steps, batch_size).
+        halt_steps : torch.Tensor
+            steps at which the network halted. Shape (batch_size,).
+        responses : torch.Tensor
+
         response_times : torch.Tensor
             Response times converted to steps. Shape (batch_size, steps) of type int.
         """
 
-        _, steps = p_halt.shape
+        _, steps = p_halts.shape
 
         # component 1.  KL between p_halt and geometric distribution (p_g)
-        p_g_batch = self.p_g[:steps, ].expand_as(p_halt)  # (batch_size, steps)
-        p_g_loss = self.kl_div(p_halt, p_g_batch)
+        p_g_batch = self.p_g[:steps, ].expand_as(p_halts)  # (batch_size, steps)
+        p_g_loss = self.kl_div(p_halts, p_g_batch)
 
-        # Original PonderNet: return p_g_loss
-
-        # component 2. KL between p_halt and empirical RT distribution
-        p_rt_empirical = torch.zeros((self.max_steps,))
+        # component 2. KL between halt steps and empirical RT distribution
+        p_rt_empirical = torch.zeros((self.max_steps + 1,))
+        p_rt_pred = torch.zeros((self.max_steps + 1,))
 
         # counting RTs; this is a quick version of a loop over RTs, borrowed from:
         # https://stackoverflow.com/questions/66315038
         rt_idx, rt_cnt = torch.unique(response_times, return_counts=True)
         p_rt_empirical[rt_idx.long()] += rt_cnt
 
-        # normalize to a probability distribution
+        # counting halting steps
+        rt_pred_idx, rt_pred_cnt = torch.unique(halt_steps, return_counts=True)
+        p_rt_pred[rt_pred_idx.long()] += rt_pred_cnt
+
+        # cap at maximum halting step for the batch
+        p_rt_empirical = p_rt_empirical[1:steps + 1]
+        p_rt_pred = p_rt_pred[1:steps + 1]
+
+        # normalize the probability distributions
         p_rt_empirical = F.normalize(p_rt_empirical, p=1, dim=0)
+        p_rt_pred = F.normalize(p_rt_pred, p=1, dim=0)
 
-        p_rt_empirical = p_rt_empirical[:steps].expand_as(p_halt)  # (batch_size, steps)
-        rt_loss = self.kl_div(p_halt, p_rt_empirical)
+        empirical_loss = self.kl_div(p_rt_pred, p_rt_empirical)
 
-        return rt_loss
+        # Note: Original PonderNet returns only p_g_loss
+        return p_g_loss + empirical_loss
