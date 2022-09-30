@@ -172,10 +172,10 @@ class NBackMockDataModule(pl.LightningDataModule):
     def _dataloader(self, dataset):
         X, targets, responses, response_steps = dataset
         loaders = {
-            'X': DataLoader(X, batch_size=self.batch_size),
-            'is_target': DataLoader(targets, batch_size=self.batch_size),
-            'response': DataLoader(responses, batch_size=self.batch_size),
-            'response_step': DataLoader(response_steps, batch_size=self.batch_size)
+            'X': DataLoader(X, batch_size=self.batch_size, num_workers=1),
+            'is_target': DataLoader(targets, batch_size=self.batch_size, num_workers=1),
+            'response': DataLoader(responses, batch_size=self.batch_size, num_workers=1),
+            'response_step': DataLoader(response_steps, batch_size=self.batch_size, num_workers=1)
         }
         return CombinedLoader(loaders)
 
