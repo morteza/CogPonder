@@ -8,16 +8,18 @@ dependencies:
   - pip
   - ipykernel
   - flake8
-  - ipywidgets
+  - ipywidgets>=7.0,<8.0  # to resolve a bug showing tqdm progress bars in VSCode notebook
+  - tqdm
   - pytest
   - pip:
     - torch
     - torchvision
     - torchaudio
+    - pytorch-lightning
+    - rich  # required by a custom lightning progress bar callback
     # - tensorflow
     # - tensorboard
     - torch-tb-profiler
     - scikit-learn
-    - tqdm
     - pandas
     - seaborn

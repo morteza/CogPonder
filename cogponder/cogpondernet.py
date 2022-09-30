@@ -12,7 +12,7 @@ class CogPonderNet(LightningModule):
         self,
         decision_model,
         embeddings_dim,
-        max_steps,
+        max_response_steps,
         lambda_p=0.5,
         loss_beta=.2,
         learning_rate: float = 1e-4,
@@ -22,13 +22,11 @@ class CogPonderNet(LightningModule):
 
         Parameters
         ----------
-        decision_cls : _type_
+        decision_model : _type_
             _description_
         embeddings_dim : _type_
             _description_
-        n_outputs : _type_
-            _description_
-        max_steps : _type_
+        max_response_steps : _type_
             _description_
         learning_rate : float, optional
             _description_, by default 1e-4
@@ -39,7 +37,7 @@ class CogPonderNet(LightningModule):
 
         self.embeddings_dim = embeddings_dim
         self.decision_model = decision_model
-        self.max_steps = max_steps
+        self.max_response_steps = max_response_steps
         self.lambda_p = lambda_p
         self.loss_beta = loss_beta
         self.learning_rate = learning_rate
@@ -59,7 +57,7 @@ class CogPonderNet(LightningModule):
 
         y, h = self.decision_model(x, h)
 
-        if step == self.max_steps:
+        if step == self.max_response_steps:
             lambda_n = torch.ones((batch_size,))
         else:
             lambda_n = self.halt_node(h).squeeze()
@@ -81,11 +79,11 @@ class CogPonderNet(LightningModule):
 
         halt_steps = torch.zeros((batch_size,))  # stopping step
 
-        for step in range(1, self.max_steps + 1):
+        for step in range(1, self.max_response_steps + 1):
 
             y_n, h, lambda_n = self.ponder_step(x, h, step)
 
-            if step == self.max_steps:
+            if step == self.max_response_steps:
                 halt_steps = torch.empty((batch_size,)).fill_(step).int()
             else:
                 _halt_step_dist = torch.distributions.Geometric(lambda_n)
@@ -119,7 +117,7 @@ class CogPonderNet(LightningModule):
         resp_step = batch['response_step']
         y_steps, p_halt, halt_steps = self.forward(X)
         loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
-        loss_reg_fn = RegularizationLoss(lambda_p=self.lambda_p, max_steps=self.max_steps)
+        loss_reg_fn = RegularizationLoss(lambda_p=self.lambda_p, max_steps=self.max_response_steps)
 
         loss_rec = loss_rec_fn(p_halt, y_steps, y)
         loss_reg = loss_reg_fn(p_halt, halt_steps, resp, resp_step)
@@ -135,7 +133,7 @@ class CogPonderNet(LightningModule):
         resp_step = batch['response_step']
         y_steps, p_halt, halt_steps = self.forward(X)
         loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
-        loss_reg_fn = RegularizationLoss(lambda_p=self.lambda_p, max_steps=self.max_steps)
+        loss_reg_fn = RegularizationLoss(lambda_p=self.lambda_p, max_steps=self.max_response_steps)
 
         loss_rec = loss_rec_fn(p_halt, y_steps, y)
         loss_reg = loss_reg_fn(p_halt, halt_steps, resp, resp_step)
