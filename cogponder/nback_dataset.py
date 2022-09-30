@@ -1,9 +1,11 @@
 import torch
 from torch.utils.data import Dataset
-import numpy as np
+import pytorch_lightning as pl
+from torch.utils.data import DataLoader, TensorDataset, random_split
+from pytorch_lightning.trainer.supporters import CombinedLoader
 
 
-class NBackDataset(Dataset):
+class NBackMockDataset(Dataset):
     """Human or mock N-back dataset -- a binary classification task/
 
     """
@@ -65,9 +67,10 @@ class NBackDataset(Dataset):
         Returns:
             X: stimulus features
                 shape: (n_subjects, n_trials - n_back, n_back)
-            responses: target labels, either 0 or 1
-                shape: (n_subjects, n_trials - n_back)
             targets: whether a trial was a match or not
+                To match tensor datatypes, 0 is False, and 1 is True.
+                shape: (n_subjects, n_trials - n_back)
+            responses: target labels, either 0 or 1
                 shape: (n_subjects, n_trials - n_back)
             response_times: response time of each trial
                 shape: (n_subjects, n_trials - n_back)
@@ -119,6 +122,68 @@ class NBackDataset(Dataset):
         return X, targets, responses[:, n_back:], response_times[:, n_back:].int()
 
 
-# DEBUG
-# dataset = NBackDataset(2, 10, 5, n_back=2)
-# print(dataset[0])
+class NBackMockDataModule(pl.LightningDataModule):
+
+    def __init__(
+        self,
+        n_subjects=2,
+        n_trials=100,
+        n_stimuli=6,
+        n_back=2,
+        train_ratio=.8,
+        batch_size=4,
+        randomized_split=False
+    ):
+        super().__init__()
+        self.save_hyperparameters()
+
+        self.n_subjects = n_subjects
+        self.n_trials = n_trials
+        self.n_stimuli = n_stimuli
+        self.n_back = n_back
+        self.train_ratio = train_ratio
+        self.batch_size = batch_size
+        self.randomized_split = randomized_split
+
+    def prepare_data(self) -> None:
+
+        self.dataset = NBackMockDataset(
+            n_subjects=self.n_subjects,
+            n_trials=self.n_trials,
+            n_back=self.n_back,
+            n_stimuli=self.n_stimuli)
+
+        # only the first subject is used
+        # TODO return all the subjects
+        X, is_targets, responses, response_steps = self.dataset[0]
+        self.dataset = TensorDataset(X, is_targets, responses, response_steps)
+
+        train_size = int(len(self.dataset) * self.train_ratio)
+        test_size = len(self.dataset) - train_size
+
+        if self.randomized_split:
+            train_subset, test_subset = random_split(self.dataset, lengths=(train_size, test_size))
+            self.train_dataset = self.dataset[train_subset.indices]
+            self.test_dataset = self.dataset[test_subset.indices]
+        else:
+            self.train_dataset = self.dataset[:train_size]
+            self.test_dataset = self.dataset[train_size:]
+
+    def _dataloader(self, dataset):
+        X, targets, responses, response_steps = dataset
+        loaders = {
+            'X': DataLoader(X, batch_size=self.batch_size),
+            'is_target': DataLoader(targets, batch_size=self.batch_size),
+            'response': DataLoader(responses, batch_size=self.batch_size),
+            'response_step': DataLoader(response_steps, batch_size=self.batch_size)
+        }
+        return CombinedLoader(loaders)
+
+    def train_dataloader(self):
+        return self._dataloader(self.train_dataset)
+    
+    def val_dataloader(self):
+        return self._dataloader(self.test_dataset)
+
+    def test_dataloader(self):
+        return self._dataloader(self.test_dataset)

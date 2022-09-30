@@ -39,7 +39,7 @@ class ReconstructionLoss(nn.Module):
 
         for n in range(max_steps):
             y_n = y_steps[:, n, 1]
-            step_loss = p_halt[:, n] * self.loss_func(y_n, y_true)  # (batch_size,)
+            step_loss = p_halt[:, n] * self.loss_func(y_n, y_true.float())  # (batch_size,)
             total_loss += step_loss.mean()  # (1,)
 
         return total_loss
@@ -69,7 +69,7 @@ class RegularizationLoss(nn.Module):
             not_halted = not_halted * (1 - lambda_p)
         self.register_buffer('p_g', p_g)  # persist p_g
 
-    def forward(self, p_halts, halt_steps, responses, response_times):
+    def forward(self, p_halts, halt_steps, responses, response_steps):
         """Compute reg_loss.
 
         Notes: `reg_loss = KL(p_halts || p_g) + KL(halt_steps || p_rt_empirical)`
@@ -82,23 +82,23 @@ class RegularizationLoss(nn.Module):
             steps at which the network halted. Shape (batch_size,).
         responses : torch.Tensor
 
-        response_times : torch.Tensor
-            Response times converted to steps. Shape (batch_size, steps) of type int.
+        response_steps : torch.Tensor
+            Response times in steps. Shape (batch_size, steps) of type int.
         """
 
         _, steps = p_halts.shape
 
-        # component 1.  KL between p_halt and geometric distribution (p_g)
-        p_g_batch = self.p_g[:steps, ].expand_as(p_halts)  # (batch_size, steps)
-        p_g_loss = self.kl_div(p_halts, p_g_batch)
+        # regularizer 1 (PonderNet): KL between p_halt and geometric distribution (p_g)
+        # p_g_batch = self.p_g[:steps, ].expand_as(p_halts)  # (batch_size, steps)
+        # p_g_loss = self.kl_div(p_halts, p_g_batch)
 
-        # component 2. KL between halt steps and empirical RT distribution
+        # regularizer 2 (CogPonder): KL between halt steps and empirical RT distribution
         p_rt_empirical = torch.zeros((self.max_steps + 1,))
         p_rt_pred = torch.zeros((self.max_steps + 1,))
 
         # counting RTs; this is a quick version of a loop over RTs, borrowed from:
         # https://stackoverflow.com/questions/66315038
-        rt_idx, rt_cnt = torch.unique(response_times, return_counts=True)
+        rt_idx, rt_cnt = torch.unique(response_steps, return_counts=True)
         p_rt_empirical[rt_idx.long()] += rt_cnt
 
         # counting halting steps
@@ -106,6 +106,7 @@ class RegularizationLoss(nn.Module):
         p_rt_pred[rt_pred_idx.long()] += rt_pred_cnt
 
         # cap at maximum halting step for the batch
+        # TODO each batch item must be handled separately
         p_rt_empirical = p_rt_empirical[1:steps + 1]
         p_rt_pred = p_rt_pred[1:steps + 1]
 
@@ -116,4 +117,5 @@ class RegularizationLoss(nn.Module):
         empirical_loss = self.kl_div(p_rt_pred, p_rt_empirical)
 
         # Note: Original PonderNet returns only p_g_loss
-        return p_g_loss + empirical_loss
+        # return empirical_loss
+        return empirical_loss
