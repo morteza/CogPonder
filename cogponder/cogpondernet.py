@@ -111,10 +111,7 @@ class CogPonderNet(LightningModule):
         return y_steps, p_halts, halt_steps
 
     def training_step(self, batch, batch_idx):
-        X = batch['X']
-        y = batch['is_target']
-        resp = batch['response']
-        resp_step = batch['response_step']
+        X, y, resp, resp_step = batch
         y_steps, p_halt, halt_steps = self.forward(X)
         loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
         loss_reg_fn = RegularizationLoss(lambda_p=self.lambda_p, max_steps=self.max_response_steps)
@@ -127,10 +124,7 @@ class CogPonderNet(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        X = batch['X']
-        y = batch['is_target']
-        resp = batch['response']
-        resp_step = batch['response_step']
+        X, y, resp, resp_step = batch
         y_steps, p_halt, halt_steps = self.forward(X)
         loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
         loss_reg_fn = RegularizationLoss(lambda_p=self.lambda_p, max_steps=self.max_response_steps)

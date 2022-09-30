@@ -1,7 +1,8 @@
+import os
 import torch
 from torch.utils.data import Dataset
 import pytorch_lightning as pl
-from torch.utils.data import DataLoader, TensorDataset, random_split
+from torch.utils.data import DataLoader, TensorDataset, random_split, Subset
 from pytorch_lightning.trainer.supporters import CombinedLoader
 
 
@@ -144,6 +145,7 @@ class NBackMockDataModule(pl.LightningDataModule):
         self.train_ratio = train_ratio
         self.batch_size = batch_size
         self.randomized_split = randomized_split
+        self.n_workers = os.cpu_count()
 
     def prepare_data(self) -> None:
 
@@ -162,22 +164,19 @@ class NBackMockDataModule(pl.LightningDataModule):
         test_size = len(self.dataset) - train_size
 
         if self.randomized_split:
-            train_subset, test_subset = random_split(self.dataset, lengths=(train_size, test_size))
-            self.train_dataset = self.dataset[train_subset.indices]
-            self.test_dataset = self.dataset[test_subset.indices]
+            self.train_dataset, self.test_dataset = random_split(self.dataset, lengths=(train_size, test_size))
         else:
-            self.train_dataset = self.dataset[:train_size]
-            self.test_dataset = self.dataset[train_size:]
+            self.train_dataset = Subset(self.dataset, torch.arange(0, train_size))
+            self.test_dataset = Subset(self.dataset, torch.arange(train_size, len(self.dataset)))
 
     def _dataloader(self, dataset):
-        X, targets, responses, response_steps = dataset
-        loaders = {
-            'X': DataLoader(X, batch_size=self.batch_size, num_workers=1),
-            'is_target': DataLoader(targets, batch_size=self.batch_size, num_workers=1),
-            'response': DataLoader(responses, batch_size=self.batch_size, num_workers=1),
-            'response_step': DataLoader(response_steps, batch_size=self.batch_size, num_workers=1)
-        }
-        return CombinedLoader(loaders)
+        dataloader = DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=self.randomized_split,
+            num_workers=self.n_workers)
+
+        return dataloader
 
     def train_dataloader(self):
         return self._dataloader(self.train_dataset)
