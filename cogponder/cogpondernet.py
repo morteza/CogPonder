@@ -15,6 +15,7 @@ class CogPonderNet(LightningModule):
         max_response_steps,
         lambda_p=0.5,
         loss_beta=.2,
+        loss_by_trial_type=True,
         learning_rate: float = 1e-4,
         **kwargs
     ):
@@ -40,16 +41,18 @@ class CogPonderNet(LightningModule):
         self.max_response_steps = max_response_steps
         self.lambda_p = lambda_p
         self.loss_beta = loss_beta
+        self.loss_by_trial_type = loss_by_trial_type
         self.learning_rate = learning_rate
 
         # the halting node predicts the probability of halting conditional on not having
         # halted before. It computes overall probability of halting at each step.
+        # input: hidden state + lambda_n
         self.halt_node = nn.Sequential(
-            nn.Linear(self.embeddings_dim, 1),
+            nn.Linear(self.embeddings_dim + 1, 1),
             nn.Sigmoid()
         )
 
-    def ponder_step(self, x, h, step):
+    def ponder_step(self, x, h, lambda_n, step):
         """A single pondering step.
         """
 
@@ -60,7 +63,8 @@ class CogPonderNet(LightningModule):
         if step == self.max_response_steps:
             lambda_n = torch.ones((batch_size,))
         else:
-            lambda_n = self.halt_node(h).squeeze()
+            h_lambda_n = torch.cat((h, lambda_n.view(1, batch_size, -1)), dim=-1)
+            lambda_n = self.halt_node(h_lambda_n).squeeze()
 
         return y, h, lambda_n
 
@@ -70,6 +74,7 @@ class CogPonderNet(LightningModule):
 
         h = torch.zeros(1, batch_size, self.embeddings_dim)
         _, h = self.decision_model(x, h)  # initialize hidden state
+        lambda_n = torch.ones((batch_size,))
 
         p_halt = torch.zeros(batch_size)
         p_continue = torch.ones(batch_size)
@@ -81,7 +86,7 @@ class CogPonderNet(LightningModule):
 
         for step in range(1, self.max_response_steps + 1):
 
-            y_n, h, lambda_n = self.ponder_step(x, h, step)
+            y_n, h, lambda_n = self.ponder_step(x, h, lambda_n, step)
 
             if step == self.max_response_steps:
                 halt_steps = torch.empty((batch_size,)).fill_(step).int()
@@ -111,26 +116,30 @@ class CogPonderNet(LightningModule):
         return y_steps, p_halts, halt_steps
 
     def training_step(self, batch, batch_idx):
-        X, y, resp, resp_step = batch
+        X, y_true, resp, resp_step = batch
         y_steps, p_halt, halt_steps = self.forward(X)
         loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
-        loss_reg_fn = RegularizationLoss(lambda_p=self.lambda_p, max_steps=self.max_response_steps)
+        loss_cog_fn = RegularizationLoss(lambda_p=self.lambda_p,
+                                         max_steps=self.max_response_steps,
+                                         by_trial_type=self.loss_by_trial_type)
 
-        loss_rec = loss_rec_fn(p_halt, y_steps, y)
-        loss_reg = loss_reg_fn(p_halt, halt_steps, resp, resp_step)
+        loss_rec = loss_rec_fn(p_halt, y_steps, y_true)
+        loss_reg = loss_cog_fn(p_halt, halt_steps, y_true, resp_step)
         loss = loss_rec + self.loss_beta * loss_reg
 
         self.log('train_loss', loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        X, y, resp, resp_step = batch
+        X, y_true, resp, resp_step = batch
         y_steps, p_halt, halt_steps = self.forward(X)
         loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
-        loss_reg_fn = RegularizationLoss(lambda_p=self.lambda_p, max_steps=self.max_response_steps)
+        loss_cog_fn = RegularizationLoss(lambda_p=self.lambda_p,
+                                         max_steps=self.max_response_steps,
+                                         by_trial_type=self.loss_by_trial_type)
 
-        loss_rec = loss_rec_fn(p_halt, y_steps, y)
-        loss_reg = loss_reg_fn(p_halt, halt_steps, resp, resp_step)
+        loss_rec = loss_rec_fn(p_halt, y_steps, y_true)
+        loss_reg = loss_cog_fn(p_halt, halt_steps, y_true, resp_step)
         loss = loss_rec + self.loss_beta * loss_reg
 
         self.log('val_loss', loss)
