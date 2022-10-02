@@ -1,9 +1,5 @@
-import os
 import torch
 from torch.utils.data import Dataset
-import pytorch_lightning as pl
-from torch.utils.data import DataLoader, TensorDataset, random_split, Subset
-from pytorch_lightning.trainer.supporters import CombinedLoader
 
 
 class NBackMockDataset(Dataset):
@@ -51,8 +47,7 @@ class NBackMockDataset(Dataset):
         return (self.X[idx, :],
                 self.responses[idx],
                 self.targets[idx],
-                self.response_times[idx, :]
-        )
+                self.response_times[idx, :])
 
     @classmethod
     def _generate_mock_data(cls, n_subjects, n_trials, n_stimuli, n_back=2):
@@ -121,68 +116,3 @@ class NBackMockDataset(Dataset):
         torch.round(response_times * 1000 / 10)
 
         return X, targets, responses[:, n_back:], response_times[:, n_back:].int()
-
-
-class NBackMockDataModule(pl.LightningDataModule):
-
-    def __init__(
-        self,
-        n_subjects=2,
-        n_trials=100,
-        n_stimuli=6,
-        n_back=2,
-        train_ratio=.8,
-        batch_size=4,
-        randomized_split=False
-    ):
-        super().__init__()
-        self.save_hyperparameters()
-
-        self.n_subjects = n_subjects
-        self.n_trials = n_trials
-        self.n_stimuli = n_stimuli
-        self.n_back = n_back
-        self.train_ratio = train_ratio
-        self.batch_size = batch_size
-        self.randomized_split = randomized_split
-        self.n_workers = os.cpu_count()
-
-    def prepare_data(self) -> None:
-
-        self.dataset = NBackMockDataset(
-            n_subjects=self.n_subjects,
-            n_trials=self.n_trials,
-            n_back=self.n_back,
-            n_stimuli=self.n_stimuli)
-
-        # only the first subject is used
-        # TODO return all the subjects
-        X, is_targets, responses, response_steps = self.dataset[0]
-        self.dataset = TensorDataset(X, is_targets, responses, response_steps)
-
-        train_size = int(len(self.dataset) * self.train_ratio)
-        test_size = len(self.dataset) - train_size
-
-        if self.randomized_split:
-            self.train_dataset, self.test_dataset = random_split(self.dataset, lengths=(train_size, test_size))
-        else:
-            self.train_dataset = Subset(self.dataset, torch.arange(0, train_size))
-            self.test_dataset = Subset(self.dataset, torch.arange(train_size, len(self.dataset)))
-
-    def _dataloader(self, dataset):
-        dataloader = DataLoader(
-            dataset,
-            batch_size=self.batch_size,
-            shuffle=self.randomized_split,
-            num_workers=self.n_workers)
-
-        return dataloader
-
-    def train_dataloader(self):
-        return self._dataloader(self.train_dataset)
-    
-    def val_dataloader(self):
-        return self._dataloader(self.test_dataset)
-
-    def test_dataloader(self):
-        return self._dataloader(self.test_dataset)

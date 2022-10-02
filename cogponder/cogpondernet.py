@@ -33,10 +33,10 @@ class CogPonderNet(LightningModule):
         """
 
         super().__init__()
-        self.save_hyperparameters(ignore=['decision_model'])
+        self.save_hyperparameters(ignore=['decision_model'], logger=False)
 
-        self.embeddings_dim = embeddings_dim
         self.decision_model = decision_model
+        self.embeddings_dim = embeddings_dim
         self.max_response_steps = max_response_steps
         self.lambda_p = lambda_p
         self.loss_beta = loss_beta
