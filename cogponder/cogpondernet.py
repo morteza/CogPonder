@@ -116,30 +116,30 @@ class CogPonderNet(LightningModule):
         return y_steps, p_halts, halt_steps
 
     def training_step(self, batch, batch_idx):
-        X, y_true, resp, resp_step = batch
-        y_steps, p_halt, halt_steps = self.forward(X)
+        X, trial_types, is_targets, responses, response_steps = batch
+        y_steps, p_halts, halt_steps = self.forward(X)
         loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
         loss_cog_fn = RegularizationLoss(lambda_p=self.lambda_p,
                                          max_steps=self.max_response_steps,
                                          by_trial_type=self.loss_by_trial_type)
 
-        loss_rec = loss_rec_fn(p_halt, y_steps, y_true)
-        loss_reg = loss_cog_fn(p_halt, halt_steps, y_true, resp_step)
+        loss_rec = loss_rec_fn(p_halts, y_steps, is_targets)
+        loss_reg = loss_cog_fn(trial_types, p_halts, halt_steps, response_steps)
         loss = loss_rec + self.loss_beta * loss_reg
 
         self.log('train_loss', loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        X, y_true, resp, resp_step = batch
-        y_steps, p_halt, halt_steps = self.forward(X)
+        X, trial_types, is_targets, responses, response_steps = batch
+        y_steps, p_halts, halt_steps = self.forward(X)
         loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
         loss_cog_fn = RegularizationLoss(lambda_p=self.lambda_p,
                                          max_steps=self.max_response_steps,
                                          by_trial_type=self.loss_by_trial_type)
 
-        loss_rec = loss_rec_fn(p_halt, y_steps, y_true)
-        loss_reg = loss_cog_fn(p_halt, halt_steps, y_true, resp_step)
+        loss_rec = loss_rec_fn(p_halts, y_steps, is_targets)
+        loss_reg = loss_cog_fn(trial_types, p_halts, halt_steps, response_steps)
         loss = loss_rec + self.loss_beta * loss_reg
 
         self.log('val_loss', loss)

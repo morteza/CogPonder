@@ -29,7 +29,7 @@ class NBackSRODataset(Dataset):
         self.data_file = data_file
 
         # load and cleanup the data
-        self.X, self.responses, self.targets, self.response_times = self.prepare_data(self.data_file)
+        self.X, self.trial_types, self.is_targets, self.responses, self.response_times = self.prepare_data(self.data_file)
 
     def __len__(self):
         """Get the number of samples.
@@ -41,8 +41,9 @@ class NBackSRODataset(Dataset):
         """
 
         return (self.X[idx, :],
+                self.trial_types[idx],
+                self.is_targets[idx],
                 self.responses[idx],
-                self.targets[idx],
                 self.response_times[idx, :])
 
     @classmethod
@@ -78,7 +79,7 @@ class NBackSRODataset(Dataset):
 
         # response (either matched or not-matched)
         responses = torch.tensor(data.key_press.astype('category').cat.codes.values)
-        responses = responses.reshape(1, -1)
+        responses = responses.reshape(1, -1).float()
 
         X = X.unfold(1, n_back + 1, 1)  # sliding window of size n_back
 
@@ -91,14 +92,19 @@ class NBackSRODataset(Dataset):
         is_targets = torch.stack(is_targets)
 
         # response time
-        # convert RTs to steps; time resolution is 100ms
+        # convert RTs to steps; time resolution is 50ms
         # TODO move time resolution (100ms) to hyper-parameters
         response_times = torch.tensor(data.rt.values).reshape(1, -1)
-        response_steps = torch.round(response_times / 100)
+        response_steps = torch.round(response_times / 100).int()
+
+        # TODO trial types
+        responses = responses.long()
+        trial_types = torch.bitwise_or(is_targets * 2, responses[:, n_back:]).int() + 1
 
         return (
             X.to(torch.int64),
+            trial_types,
             is_targets,
-            responses[:, n_back:].float(),
-            response_steps[:, n_back:].int()
+            responses[:, n_back:],
+            response_steps[:, n_back:]
         )

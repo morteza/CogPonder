@@ -16,8 +16,8 @@ class NBackDataModule(pl.LightningDataModule):
         super().__init__()
         self.save_hyperparameters(ignore=['dataset'], logger=False)
 
-        X, is_targets, responses, response_steps = dataset[0]
-        self.dataset = TensorDataset(X, is_targets, responses, response_steps)
+        X, trial_types, is_targets, responses, response_steps = dataset[0]
+        self.dataset = TensorDataset(X, trial_types, is_targets, responses, response_steps)
 
         self.train_ratio = train_ratio
         self.batch_size = batch_size

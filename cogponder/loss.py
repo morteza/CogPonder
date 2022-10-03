@@ -71,7 +71,7 @@ class RegularizationLoss(nn.Module):
             not_halted = not_halted * (1 - self.lambda_p)
         self.register_buffer('p_g', p_g)  # persist p_g
 
-    def forward(self, p_halts, halt_steps, trial_types, response_steps):
+    def forward(self, trial_types, p_halts, halt_steps, response_steps):
         """Compute reg_loss.
 
         Notes: `reg_loss = KL(p_rt_pred || p_rt_true)`, which can also be separated by trial_type.
@@ -94,9 +94,10 @@ class RegularizationLoss(nn.Module):
             # TODO: use torch.unique() to get the unique trial_type
 
             loss = torch.tensor(0.)
-            for trial_type in torch.unique(trial_types):
-                _response_steps = response_steps[trial_type]
-                _halt_steps = halt_steps[trial_type]
+            for tt in torch.unique(trial_types):
+                _mask = (trial_types == tt)
+                _response_steps = response_steps[_mask]
+                _halt_steps = halt_steps[_mask]
                 loss += self._compute_rt_loss(_response_steps, _halt_steps, steps)
         else:
             loss = self._compute_rt_loss(response_steps, halt_steps, steps)
