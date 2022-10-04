@@ -9,24 +9,23 @@ import torch.nn.functional as F
 
 
 class ReconstructionLoss(nn.Module):
-    """Weighted average of classification losses."""
 
     def __init__(self, loss_func):
         super().__init__()
 
         self.loss_func = loss_func
 
-    def forward(self, p_halt, y_steps, y_true):
+    def forward(self, p_halts, y_steps, y_true):
         """Compute reconstruction loss.
 
         Args:
         ----------
         p_halt : torch.Tensor
-            probability of halting. Shape (steps, batch_size).
+            probability of halting at each step, of shape (batch_size, steps).
         y_steps: torch.Tensor
-            predicted y at each step. Shape (batch_size, steps)
+            predicted y at each step, of shape (batch_size, steps).
         y_true:
-            Ground truth y. Shape (batch_size, steps)
+            Ground truth y, of shape (batch_size,).
 
         Returns:
         ----------
@@ -34,12 +33,13 @@ class ReconstructionLoss(nn.Module):
             Scalar loss.
         """
 
-        _, max_steps = p_halt.shape
-        total_loss = p_halt.new_tensor(0.0)
+        _, steps = p_halts.shape
+        total_loss = p_halts.new_tensor(0.0)
 
-        for n in range(max_steps):
+        for n in range(steps):
             y_n = y_steps[:, n, 1]
-            step_loss = p_halt[:, n] * self.loss_func(y_n, y_true.float())  # (batch_size,)
+            p_n = p_halts[:, n]
+            step_loss = p_n * self.loss_func(y_n, y_true.float())  # (batch_size,)
             total_loss += step_loss.mean()  # (1,)
 
         return total_loss
@@ -91,18 +91,17 @@ class RegularizationLoss(nn.Module):
         _, steps = p_halts.shape
 
         if self.by_trial_type:
-            # TODO: use torch.unique() to get the unique trial_type
-
-            loss = torch.tensor(0.)
+            total_loss = torch.tensor(0.)
             for tt in torch.unique(trial_types):
                 _mask = (trial_types == tt)
                 _response_steps = response_steps[_mask]
                 _halt_steps = halt_steps[_mask]
-                loss += self._compute_rt_loss(_response_steps, _halt_steps, steps)
+                loss = self._compute_rt_loss(_response_steps, _halt_steps, steps)
+                total_loss += loss
         else:
-            loss = self._compute_rt_loss(response_steps, halt_steps, steps)
+            total_loss = self._compute_rt_loss(response_steps, halt_steps, steps)
 
-        return loss
+        return total_loss
 
     def _compute_rt_loss(self, rt_true, rt_pred, steps):
         """CogPonder regularizer: KL between halt steps and empirical RT distribution.
@@ -125,9 +124,11 @@ class RegularizationLoss(nn.Module):
         p_rt_pred = p_rt_pred[1:steps + 1]
 
         # normalize the probability distributions
-        p_rt_true = F.normalize(p_rt_true, p=1, dim=0)
-        p_rt_pred = F.normalize(p_rt_pred, p=1, dim=0)
+        # p_rt_true = F.normalize(p_rt_true, p=1, dim=0)
+        # p_rt_pred = F.normalize(p_rt_pred, p=1, dim=0)
 
-        rt_loss = self.kl_div(p_rt_pred, p_rt_true)
+        # ALT: rt_loss = torch.abs(rt_pred.float() - rt_true.float())
+        loss = self.kl_div(p_rt_pred, p_rt_true)
 
-        return rt_loss
+        # return loss
+        return 0.0
