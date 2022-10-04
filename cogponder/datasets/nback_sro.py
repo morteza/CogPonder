@@ -1,6 +1,7 @@
 import torch
 import pandas as pd
 from torch.utils.data import Dataset
+from pathlib import Path
 
 
 class NBackSRODataset(Dataset):
@@ -29,7 +30,8 @@ class NBackSRODataset(Dataset):
         self.data_file = data_file
 
         # load and cleanup the data
-        self.X, self.trial_types, self.is_targets, self.responses, self.response_times = self.prepare_data(self.data_file)
+        self.X, self.trial_types, self.is_targets, self.responses, self.response_times = \
+            self.prepare_data(self.data_file)
 
     def __len__(self):
         """Get the number of samples.

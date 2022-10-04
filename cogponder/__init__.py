@@ -1,4 +1,3 @@
-from .loss import ReconstructionLoss, RegularizationLoss
 from .icom import ICOM
 from .cogpondernet import CogPonderNet
 from .evaluate import evaluate

@@ -4,25 +4,25 @@ import torch.nn.functional as F
 
 
 class ICOM(nn.Module):
-    def __init__(self, n_inputs, n_channels, n_outputs):
+    def __init__(self, n_inputs, n_embeddings, n_outputs):
 
         super(ICOM, self).__init__()
 
         self.n_inputs = n_inputs
-        self.n_channels = n_channels
+        self.n_embeddings = n_embeddings
         self.n_outputs = n_outputs
 
         # encode: x -> sent_msg
         self.encode = nn.Sequential(
-            nn.Linear(n_inputs, n_channels, bias=False)
+            nn.Linear(n_inputs, n_embeddings, bias=False)
         )
 
         # transmit: sent_msg -> rcvd_msg
-        self.transmit = nn.RNN(n_channels, n_channels, batch_first=False)
+        self.transmit = nn.RNN(n_embeddings, n_embeddings, batch_first=False)
 
         # decode: rcvd_msg -> response
         self.decode = nn.Sequential(
-            nn.Linear(n_channels, n_outputs, bias=False),
+            nn.Linear(n_embeddings, n_outputs, bias=False),
             nn.Softmax(dim=2)
         )
 
@@ -50,11 +50,11 @@ class ICOM(nn.Module):
 
     def _init_h(self, batch_size):
 
-        h0 = torch.zeros(1, batch_size, self.n_channels)
+        h0 = torch.zeros(1, batch_size, self.n_embeddings)
         return h0
 
 
 # DEBUG
-# model = ICOM(n_inputs=10, n_channels=4, n_outputs=2)
+# model = ICOM(n_inputs=10, n_embeddings=4, n_outputs=2)
 # X = torch.randint(0, 10, (10, 3))
 # y_pred, h = model(X)
