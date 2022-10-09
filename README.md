@@ -1,5 +1,6 @@
 # CogPonder
-Cognitive Pondering: A multitask model of speed and accuracy in cognitive tests.
+
+An Interoperable Multitask Model of Response Times in Cognitive Tests
 
 
 ## Setup
