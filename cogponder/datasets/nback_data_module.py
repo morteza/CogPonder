@@ -9,9 +9,10 @@ class NBackDataModule(pl.LightningDataModule):
     def __init__(
         self,
         dataset,
-        train_ratio=.8,
+        train_ratio=.75,
         batch_size=4,
-        randomized_split=False
+        randomized_split=False,
+        num_workers=os.cpu_count()
     ):
         super().__init__()
         self.save_hyperparameters(ignore=['dataset'], logger=False)
@@ -22,7 +23,7 @@ class NBackDataModule(pl.LightningDataModule):
         self.train_ratio = train_ratio
         self.batch_size = batch_size
         self.randomized_split = randomized_split
-        self.n_workers = os.cpu_count()
+        self.num_workers = num_workers
 
     def prepare_data(self) -> None:
 
@@ -43,7 +44,7 @@ class NBackDataModule(pl.LightningDataModule):
             dataset,
             batch_size=self.batch_size,
             shuffle=self.randomized_split,
-            num_workers=self.n_workers)
+            num_workers=self.num_workers)
 
         return dataloader
 

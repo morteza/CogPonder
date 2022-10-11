@@ -13,7 +13,6 @@ class NBackSRODataset(Dataset):
         self,
         n_subjects,
         n_back=2,
-        device='cpu',
         data_file='data/Self_Regulation_Ontology/adaptive_n_back.csv.gz'
     ):
 
@@ -22,10 +21,8 @@ class NBackSRODataset(Dataset):
         Args:
             n_subjects (int): Number of subjects.
             n_back (int): Number of items in the N-back sequence. Default: 2.
-            device (torch.device): Device to use for the dataset.
         """
         self.n_subjects = n_subjects
-        self.device = device
         self.n_back = n_back
         self.data_file = data_file
 
