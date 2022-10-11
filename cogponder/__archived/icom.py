@@ -39,12 +39,18 @@ class ICOM(nn.Module):
             h = self._init_h(batch_size)
 
         msg = F.one_hot(x, num_classes=self.n_inputs).type(torch.float)
+        print('[1]', msg.shape)
         msg = self.encode(msg)
+        print('[2]', msg.shape)
         msg = msg.transpose(0, 1)  # reshape for RNN
+        print('[3]', msg.shape)
         msg, h = self.transmit(msg, h)
+        print('[4]', msg.shape)
         msg = msg.transpose(0, 1)  # reshape for linear layer
-        y = self.decode(msg)
-        y = y[:, -1, :]  # last time step
+        print('[5]', msg.shape)
+        msg = self.decode(msg)
+        print('[6]', msg.shape)
+        y = msg[:, -1, :]  # last output (in n-back)
         # y = y.argmax(dim=1).float()
         return y, h
 

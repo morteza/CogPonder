@@ -8,7 +8,7 @@ from tqdm.auto import tqdm
 from cogponder import ICOM, NBackDataset
 from torch.utils.data import TensorDataset
 
-from cogponder.nback_rnn import NBackRNN
+from cogponder.__archived.nback_rnn import NBackRNN
 
 
 def test_nback_rnn(n_epochs=1000, n_stimuli=10):

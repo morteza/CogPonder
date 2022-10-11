@@ -100,11 +100,10 @@ class NBackSRODataset(Dataset):
         response_steps = torch.round(response_times / 100).int()
 
         # TODO trial types
-        responses = responses.long()
-        trial_types = torch.bitwise_or(is_targets * 2, responses[:, n_back:]).int() + 1
+        trial_types = torch.bitwise_or(is_targets * 2, responses[:, n_back:].long()).int() + 1
 
         return (
-            X.to(torch.int64),
+            X.float(),
             trial_types,
             is_targets,
             responses[:, n_back:],

@@ -5,7 +5,7 @@ from sklearn.metrics import accuracy_score
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from .losses import ReconstructionLoss, RegularizationLoss
+from ..losses import ReconstructionLoss, RegularizationLoss
 
 
 def evaluate(

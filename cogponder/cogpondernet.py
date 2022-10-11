@@ -2,7 +2,6 @@
 
 import torch
 from torch import nn
-from torch.nn import functional as F
 from pytorch_lightning import LightningModule
 from cogponder.losses import ReconstructionLoss, CognitiveLoss
 
@@ -10,17 +9,13 @@ from cogponder.losses import ReconstructionLoss, CognitiveLoss
 class CogPonderNet(LightningModule):
     def __init__(
         self,
-        decision_model,
         config,
         example_input_array=None,
-        **kwargs
     ):
         """CogPonder model written in PyTorch Lightning
 
         Parameters
         ----------
-        decision_model : _type_
-            _description_
         max_response_step : _type_
             _description_
         learning_rate : float, optional
@@ -28,105 +23,88 @@ class CogPonderNet(LightningModule):
         """
 
         super().__init__()
-        self.save_hyperparameters(ignore=['decision_model', 'example_input_array'], logger=False)
+        self.save_hyperparameters(ignore=['example_input_array'], logger=False)
 
-        self.decision_model = decision_model
+        self.inputs_dim = config['inputs_dim']
         self.embeddings_dim = config['embeddings_dim']
         self.lambda_p = config['lambda_p']
-        self.loss_beta = config['loss_beta']
+        self.rec_loss_beta = config['rec_loss_beta']
+        self.cog_loss_beta = config['cog_loss_beta']
         self.loss_by_trial_type = config['loss_by_trial_type']
         self.learning_rate = config['learning_rate']
         self.max_response_step = config['max_response_step']
         self.example_input_array = example_input_array
 
-        # init halt node
-        # the halting node predicts the probability of halting conditional on not having
-        # halted before. It computes overall probability of halting at each step.
-        # input: hidden state + lambda_n
+        # init nodes: halt_node, output_node, recurrent_node
         self.halt_node = nn.Sequential(
-            nn.Linear(self.decision_model.n_embeddings + 1, 1),
+            nn.Linear(self.embeddings_dim, 1),
             nn.Sigmoid()
         )
 
-    def ponder_step(self, x, h, lambda_n, step):
-        """A single pondering step.
-        """
+        self.output_node = nn.Sequential(
+            nn.Linear(self.embeddings_dim, 1),
+            nn.Sigmoid()
+        )
 
-        y, h = self.decision_model(x, h)
-
-        if step == self.max_response_step:
-            lambda_n = torch.ones((x.size(0),))
-        else:
-            h_lambda_n = torch.cat((h, lambda_n.view(1, x.size(0), -1)), dim=-1)
-            lambda_n = self.halt_node(h_lambda_n).squeeze()
-
-        return y, h, lambda_n
+        self.recurrent_node = nn.GRUCell(self.inputs_dim, self.embeddings_dim)
 
     def forward(self, x):
 
         batch_size = x.size(0)
 
-        h = torch.zeros(1, batch_size, self.embeddings_dim)
-        _, h = self.decision_model(x, h)  # initialize hidden state
-        lambda_n = torch.full((batch_size,), self.lambda_p)
-
-        p_halt = torch.zeros(batch_size)
+        h = torch.zeros(batch_size, self.embeddings_dim)
         p_continue = torch.ones(batch_size)
+        halt_steps = torch.zeros(batch_size, dtype=torch.long)
 
-        y_steps = []
-        p_halts = []
+        y_list = []
+        p_list = []
 
-        # stopping step (0 means not-halted yet)
-        halt_steps = torch.full((batch_size,), self.max_response_step, dtype=torch.int)
+        for n in range(1, self.max_response_step + 1):
 
-        for step in range(1, self.max_response_step + 1):
+            if n == self.max_response_step:
+                lambda_n = torch.ones((batch_size,))
+            else:
+                lambda_n = self.halt_node(h)[:, 0]
 
-            y_n, h, lambda_n = self.ponder_step(x, h, lambda_n, step)
+            y_step = self.output_node(h)[:, 0]
+            h = self.recurrent_node(x, h)
+
+            y_list.append(y_step)
+            p_list.append(p_continue * lambda_n)
+
+            p_continue = p_continue * (1 - lambda_n)
 
             # update halt_steps
-            halt_steps_dist = torch.distributions.Bernoulli(lambda_n)
-            halt_mask_n = halt_steps_dist.sample().bool()
-            halt_steps_n = torch.full((batch_size,), step, dtype=torch.int)
-            halt_steps = torch.where(halt_mask_n,
-                                     torch.min(halt_steps_n, halt_steps),
-                                     halt_steps)
+            halt_steps = torch.maximum(
+                n * (halt_steps == 0) * torch.bernoulli(lambda_n).to(torch.long),
+                halt_steps,
+            )
 
-            # update probabilities
-            p_halt = p_continue * lambda_n  # p_halt = ...(1-p)p
-            p_continue = p_continue * (1 - lambda_n)  # update p_continue = ...(1-p)(1-p)
-
-            y_steps.append(y_n)
-            p_halts.append(p_halt)
-
-            if torch.all(halt_steps <= step):
+            if (halt_steps > 0).sum() == batch_size:
                 break
 
         # prepare outputs of the forward pass
-        y_steps = torch.stack(y_steps).transpose(0, 1)  # -> (batch,step)
-        p_halts = torch.stack(p_halts).transpose(0, 1)  # -> (batch,step)
+        y = torch.stack(y_list)  # (step, batch)
+        p = torch.stack(p_list)  # (step, batch)
 
         # the probability of halting at all the steps sums to 1
         for i in range(batch_size):
-            halt_step_idx = halt_steps[i] - 1
-            p_halts[i, halt_step_idx:] = 0.0
-            p_halts[i, halt_step_idx] = 1 - p_halts[i, :halt_step_idx].sum()
+            halt_step = halt_steps[i] - 1
+            p[halt_step:, i] = 0.0
+            p[halt_step, i] = 1 - p[:halt_step, i].sum()
 
-        y_steps = F.pad(y_steps, (0, 0, 0, self.max_response_step - y_steps.size(1)), 'constant', 0)
-        p_halts = F.pad(p_halts, (0, self.max_response_step - p_halts.size(1)), 'constant', 0)
-
-        return y_steps, p_halts, halt_steps
+        return y, p, halt_steps
 
     def training_step(self, batch, batch_idx):
-        X, trial_types, is_targets, responses, response_steps = batch
-        y_steps, p_halts, halt_steps = self.forward(X)
-        loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
-        loss_cog_fn = CognitiveLoss(lambda_p=self.lambda_p,
-                                    max_steps=self.max_response_step,
-                                    by_trial_type=self.loss_by_trial_type)
+        X, trial_types, is_targets, responses, rt_true = batch
+        y_true = is_targets.float()
+        y_steps, p_halts, rt_pred = self.forward(X)
+        loss_rec_fn = ReconstructionLoss()
+        loss_cog_fn = CognitiveLoss(self.lambda_p, self.max_response_step)
 
-        loss_rec = loss_rec_fn(p_halts, y_steps, is_targets)
-        loss_cog = loss_cog_fn(trial_types, p_halts, halt_steps, response_steps)
-        loss = loss_rec + self.loss_beta * loss_cog
+        loss_rec = loss_rec_fn(p_halts, y_steps, y_true)
+        loss_cog = loss_cog_fn(rt_pred, rt_true)
+        loss = self.rec_loss_beta * loss_rec + self.cog_loss_beta * loss_cog
 
         self.log('train_loss_rec', loss_rec, on_epoch=True)
         self.log('train_loss_cog', loss_cog, on_epoch=True)
@@ -134,16 +112,15 @@ class CogPonderNet(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        X, trial_types, is_targets, responses, response_steps = batch
-        y_steps, p_halts, halt_steps = self.forward(X)
-        loss_rec_fn = ReconstructionLoss(nn.BCELoss(reduction='mean'))
-        loss_cog_fn = CognitiveLoss(lambda_p=self.lambda_p,
-                                    max_steps=self.max_response_step,
-                                    by_trial_type=self.loss_by_trial_type)
+        X, trial_types, is_targets, responses, rt_true = batch
+        y_true = is_targets.float()
+        y_steps, p_halts, rt_pred = self.forward(X)
+        loss_rec_fn = ReconstructionLoss()
+        loss_cog_fn = CognitiveLoss(self.lambda_p, self.max_response_step)
 
-        loss_rec = loss_rec_fn(p_halts, y_steps, is_targets)
-        loss_cog = loss_cog_fn(trial_types, p_halts, halt_steps, response_steps)
-        loss = loss_rec + self.loss_beta * loss_cog
+        loss_rec = loss_rec_fn(p_halts, y_steps, y_true)
+        loss_cog = loss_cog_fn(rt_pred, rt_true)
+        loss = self.rec_loss_beta * loss_rec + self.cog_loss_beta * loss_cog
 
         self.log('val_loss_rec', loss_rec, on_epoch=True)
         self.log('val_loss_cog', loss_cog, on_epoch=True)
