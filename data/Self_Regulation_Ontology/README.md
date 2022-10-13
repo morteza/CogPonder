@@ -1,5 +1,18 @@
 
-> Original repository: https://github.com/poldrack/Self_Regulation_Ontology/
+# Stroop Task
+
+worker_id
+condition
+correct
+rt
+stim_color
+stim_word
+
+# Adaptive N-Back
+
+## License
+
+> From the original repository: https://github.com/poldrack/Self_Regulation_Ontology/
 
 Shield: [![CC BY 4.0][cc-by-shield]][cc-by]
 
