@@ -38,8 +38,9 @@ class CognitiveLoss(nn.Module):
                 loss = (_halt_steps - _rt_true).abs().float().mean()
                 total_loss += loss
         else:
-            # total_loss = (rt_pred - rt_true).abs().float().mean()
-            total_loss = self.rt_dist_loss(rt_pred, rt_true)
+            # total_loss = (rt_pred.float().mean() - rt_true.float().mean()).abs()
+            total_loss = (rt_pred - rt_true).abs().float().mean()
+            # total_loss = self.rt_dist_loss(rt_pred, rt_true)
 
         return total_loss
 
@@ -55,7 +56,7 @@ class CognitiveLoss(nn.Module):
             Shape (batch_size, steps) of type int.
         """
 
-        # steps = rt_true.max().item()  # maximum number of steps in the batch
+        steps = rt_true.max().item()  # maximum number of steps in the batch
 
         # 1. compute distributions
         rt_true_dist = rt_pred.new_zeros((self.max_steps + 1,), dtype=torch.float)
@@ -66,9 +67,12 @@ class CognitiveLoss(nn.Module):
         rt_pred_idx, rt_pred_cnt = torch.unique(rt_pred, return_counts=True)
         rt_pred_dist[rt_pred_idx.long()] += rt_pred_cnt
 
+        # rt_true_dist = rt_pred_dist[:steps]
+        # rt_pred_dist = rt_pred_dist[:steps]
+
         # 2. normalize
-        # rt_true_dist = F.normalize(rt_true_dist, p=1, dim=0)
-        # rt_pred_dist = F.normalize(rt_pred_dist, p=1, dim=0)
+        rt_true_dist = F.normalize(rt_true_dist, p=1, dim=0)
+        rt_pred_dist = F.normalize(rt_pred_dist, p=1, dim=0)
 
         # 3. compute the KL divergence between the two normalized distributions
         loss = self.kl_div(rt_pred_dist, rt_true_dist)
