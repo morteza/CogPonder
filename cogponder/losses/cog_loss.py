@@ -58,18 +58,21 @@ class CognitiveLoss(nn.Module):
 
         steps = rt_true.max().item()  # maximum number of steps in the batch
 
-        # 1. compute RT_TRUE distribution
+        # 1. compute normal distributions
         rt_true_norm = torch.distributions.Normal(rt_true.float().mean(), rt_true.float().std())
-        rt_true_dist = rt_true_norm.log_prob(torch.arange(0, self.max_steps + 1)).exp()
+        rt_pred_norm = torch.distributions.Normal(rt_pred.float().mean(), rt_pred.float().std())
 
-        # 1. compute RT_PRED distribution
-        rt_pred_dist = rt_pred.new_zeros((self.max_steps + 1,), dtype=torch.float)
-        rt_pred_idx, rt_pred_cnt = torch.unique(rt_pred, return_counts=True)
-        rt_pred_dist[rt_pred_idx.long()] += rt_pred_cnt
-        # 1.1. normalize
-        rt_pred_dist = F.normalize(rt_pred_dist, p=1, dim=0)
+
+        # rt_true_dist = rt_true_norm.log_prob(torch.arange(0, self.max_steps + 1)).exp()
+        # rt_pred_dist = rt_pred_norm.log_prob(torch.arange(0, self.max_steps + 1)).exp()
+
+        # rt_pred_dist = rt_pred.new_zeros((self.max_steps + 1,), dtype=torch.float)
+        # rt_pred_idx, rt_pred_cnt = torch.unique(rt_pred, return_counts=True)
+        # rt_pred_dist[rt_pred_idx.long()] += rt_pred_cnt
+        # rt_pred_dist = F.normalize(rt_pred_dist, p=1, dim=0)  # normalize
 
         # 2. compute the KL divergence between the two normalized distributions
-        loss = self.kl_div(rt_pred_dist, rt_true_dist)
+        loss = torch.distributions.kl_divergence(rt_pred_norm, rt_true_norm)
+        # loss = self.kl_div(rt_pred_dist, rt_true_dist)
 
         return loss
