@@ -39,8 +39,8 @@ class CognitiveLoss(nn.Module):
                 total_loss += loss
         else:
             # total_loss = (rt_pred.float().mean() - rt_true.float().mean()).abs()
-            total_loss = (rt_pred - rt_true).abs().float().mean()
-            # total_loss = self.rt_dist_loss(rt_pred, rt_true)
+            # total_loss = (rt_pred - rt_true).abs().float().mean()
+            total_loss = self.rt_dist_loss(rt_pred, rt_true)
 
         return total_loss
 
@@ -59,9 +59,8 @@ class CognitiveLoss(nn.Module):
         steps = rt_true.max().item()  # maximum number of steps in the batch
 
         # 1. compute RT_TRUE distribution
-        rt_true_norm = torch.distributions.Normal(rt_true.mean(), rt_true.std())
-        rt_true_dist = rt_true_norm.log_prob(torch.arange(0, self.max_steps)).exp()
-        print('true mean', rt_true.detach().mean())
+        rt_true_norm = torch.distributions.Normal(rt_true.float().mean(), rt_true.float().std())
+        rt_true_dist = rt_true_norm.log_prob(torch.arange(0, self.max_steps + 1)).exp()
 
         # 1. compute RT_PRED distribution
         rt_pred_dist = rt_pred.new_zeros((self.max_steps + 1,), dtype=torch.float)
