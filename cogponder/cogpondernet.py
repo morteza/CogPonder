@@ -86,7 +86,8 @@ class CogPonderNet(LightningModule):
                 ((halt_steps == 0) * n * torch.bernoulli(lambda_n)).to(torch.long)
             )
 
-            if (halt_steps > 0).sum() == batch_size:
+            # IGNORE: for debugging
+            if False & (halt_steps > 0).sum() == batch_size:
                 break
 
         # prepare outputs of the forward pass
@@ -107,7 +108,7 @@ class CogPonderNet(LightningModule):
         y_steps, p_halts, rt_pred = self.forward(X)
 
         rec_loss = self.rec_loss_fn(p_halts, y_steps, y_true)
-        cog_loss = self.cog_loss_fn(rt_pred, rt_true)
+        cog_loss = self.cog_loss_fn(p_halts, rt_true)
         loss = self.rec_loss_beta * rec_loss + self.cog_loss_beta * cog_loss
 
         y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
@@ -125,7 +126,7 @@ class CogPonderNet(LightningModule):
         y_steps, p_halts, rt_pred = self.forward(X)
 
         rec_loss = self.rec_loss_fn(p_halts, y_steps, y_true)
-        cog_loss = self.cog_loss_fn(rt_pred, rt_true)
+        cog_loss = self.cog_loss_fn(p_halts, rt_true)
         loss = self.rec_loss_beta * rec_loss + self.cog_loss_beta * cog_loss
 
         y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
