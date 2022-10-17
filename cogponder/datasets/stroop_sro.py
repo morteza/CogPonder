@@ -1,7 +1,6 @@
 import torch
 import pandas as pd
 from torch.utils.data import Dataset
-from pathlib import Path
 
 
 class StroopSRODataset(Dataset):
@@ -12,23 +11,24 @@ class StroopSRODataset(Dataset):
     def __init__(
         self,
         n_subjects,
-        rt_bin_size=20,
+        response_step_interval=20,
         data_file='data/Self_Regulation_Ontology/stroop.csv.gz'
     ):
 
-        """Initialize the dataset.
+        """Initialize and load the SRO Stroop dataset.
 
         Args:
             n_subjects (int): Number of subjects.
-            rt_bin_size (int): Size of the bins for the response time in millis.
+            response_step_interval (int):
+                Size of the bins for the conversion of the response time to steps; in millis.
         """
         self.n_subjects = n_subjects
-        self.rt_bin_size = rt_bin_size
+        self.response_step_interval = response_step_interval
         self.data_file = data_file
 
         # load and cleanup the data
         self.X, self.conditions, self.is_corrects, self.response_times = \
-            self.prepare_data(self.rt_bin_size, self.data_file)
+            self.prepare_data(self.response_step_interval, self.data_file)
 
     def __len__(self):
         """Get the number of samples.
@@ -45,7 +45,7 @@ class StroopSRODataset(Dataset):
                 self.response_times[idx, :])
 
     @classmethod
-    def prepare_data(cls, rt_bin_size, data_file):
+    def prepare_data(cls, response_step_interval, data_file):
         """[summary]
         # TODO required data columns:
                 # condition,
@@ -55,7 +55,10 @@ class StroopSRODataset(Dataset):
                 # stim_word
 
         Args:
-            data_file (File): [description]
+            response_step_interval (int):
+                Size of the bins for the response time in millis.
+            data_file (File):
+                SRO compressed file containing the data; original file name: stroop.csv.gz.
 
         Returns:
             X: stimulus features
@@ -96,7 +99,7 @@ class StroopSRODataset(Dataset):
         # convert RTs to steps; time resolution is 50ms
         # TODO move time resolution (100ms) to hyper-parameters
         response_times = torch.tensor(data['rt'].values).reshape(1, -1)
-        response_steps = torch.round(response_times / rt_bin_size).int()
+        response_steps = torch.round(response_times / response_step_interval).int()
 
         return (
             X,

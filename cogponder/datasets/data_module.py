@@ -1,10 +1,11 @@
 import os
+from attr import attr
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader, TensorDataset, random_split, Subset
 
 
-class NBackDataModule(pl.LightningDataModule):
+class CogPonderDataModule(pl.LightningDataModule):
 
     def __init__(
         self,
@@ -17,8 +18,8 @@ class NBackDataModule(pl.LightningDataModule):
         super().__init__()
         self.save_hyperparameters(ignore=['dataset'], logger=False)
 
-        X, trial_types, is_targets, responses, response_steps = dataset[0]
-        self.dataset = TensorDataset(X, trial_types, is_targets, responses, response_steps)
+        # X, conditions, is_corrects, response_steps = dataset[0]
+        self.dataset = TensorDataset(*dataset[0])
 
         self.train_ratio = train_ratio
         self.batch_size = batch_size
@@ -49,10 +50,22 @@ class NBackDataModule(pl.LightningDataModule):
         return dataloader
 
     def train_dataloader(self):
+        if not hasattr(self, 'train_dataset'):
+            raise ValueError('Dataset is not loaded yet. It will be loaded automatically. '
+                             'If you need manual access, call prepare_data() first.')
+
         return self._dataloader(self.train_dataset)
     
     def val_dataloader(self):
+        if not hasattr(self, 'test_dataset'):
+            raise ValueError('Dataset is not loaded yet. It will be loaded automatically. '
+                             'If you need manual access, call prepare_data() first.')
+
         return self._dataloader(self.test_dataset)
 
     def test_dataloader(self):
+        if not hasattr(self, 'test_dataset'):
+            raise ValueError('Dataset is not loaded yet. It will be loaded automatically. '
+                             'If you need manual access, call prepare_data() first.')
+
         return self._dataloader(self.test_dataset)

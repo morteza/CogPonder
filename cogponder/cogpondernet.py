@@ -33,6 +33,7 @@ class CogPonderNet(LightningModule):
         self.loss_by_trial_type = config['loss_by_trial_type']
         self.learning_rate = config['learning_rate']
         self.max_response_step = config['max_response_step']
+        self.task = config['task']
 
         self.example_input_array = example_input_array
         
@@ -103,36 +104,59 @@ class CogPonderNet(LightningModule):
         return y, p, halt_steps
 
     def training_step(self, batch, batch_idx):
-        X, trial_types, is_targets, responses, rt_true = batch
-        y_true = responses.float()
+
+        # unpack task-specific batch
+        if self.task == 'nback':
+            X, trial_types, is_targets, responses, rt_true = batch
+            y_true = responses.float()
+        elif self.task == 'stroop':
+            X, trial_types, is_corrects, rt_true = batch
+            y_true = is_corrects.float()
+
+        # forward pass
         y_steps, p_halts, rt_pred = self.forward(X)
 
+        # compute losses
         rec_loss = self.rec_loss_fn(p_halts, y_steps, y_true)
         cog_loss = self.cog_loss_fn(p_halts, rt_true)
         loss = self.rec_loss_beta * rec_loss + self.cog_loss_beta * cog_loss
 
+        # compute accuracy
         y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
         self.train_accuracy(y_pred, y_true.int())
-        self.log('train_accuracy', self.train_accuracy, on_epoch=True)
 
+        # log metrics
+        self.log('train_accuracy', self.train_accuracy, on_epoch=True)
         self.log('train_loss_rec', rec_loss, on_epoch=True)
         self.log('train_loss_cog', cog_loss, on_epoch=True)
         self.log('train_loss', loss, on_epoch=True, logger=True)
+
         return loss
 
     def validation_step(self, batch, batch_idx):
-        X, trial_types, is_targets, responses, rt_true = batch
-        y_true = responses.float()
+
+        # unpack task-specific batch
+        if self.task == 'nback':
+            X, trial_types, is_targets, responses, rt_true = batch
+            y_true = responses.float()
+        elif self.task == 'stroop':
+            X, trial_types, is_corrects, rt_true = batch
+            y_true = is_corrects.float()
+
+        # forward pass
         y_steps, p_halts, rt_pred = self.forward(X)
 
+        # compute losses
         rec_loss = self.rec_loss_fn(p_halts, y_steps, y_true)
         cog_loss = self.cog_loss_fn(p_halts, rt_true)
         loss = self.rec_loss_beta * rec_loss + self.cog_loss_beta * cog_loss
 
+        # compute accuracy
         y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
         self.val_accuracy(y_pred, y_true.int())
-        self.log('val_accuracy', self.val_accuracy, on_epoch=True)
 
+        # log metrics
+        self.log('val_accuracy', self.val_accuracy, on_epoch=True)
         self.log('val_loss_rec', rec_loss, on_epoch=True)
         self.log('val_loss_cog', cog_loss, on_epoch=True)
         self.log('val_loss', loss, on_epoch=True, logger=True)
