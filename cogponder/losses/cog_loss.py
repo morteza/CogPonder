@@ -73,7 +73,9 @@ class CognitiveLoss(nn.Module):
         rt_true_dist[rt_true_idx.long()] += rt_pred_cnt
         rt_true_dist = F.normalize(rt_true_dist, p=1, dim=0)  # normalize
 
-        p_halts = p_halts.transpose(0, 1)
+        p_halts = p_halts.transpose(0, 1)  # (batch_size, steps)
+
+        rt_true_dist = rt_true_dist.expand(p_halts.size(0), p_halts.size(1))  # (batch_size, steps)
 
         # 2. compute the KL divergence between the two normalized distributions
         # loss = torch.distributions.kl_divergence(rt_pred_norm.log(), rt_true_norm)
