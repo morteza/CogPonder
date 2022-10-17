@@ -93,7 +93,10 @@ class StroopSRODataset(Dataset):
         # TODO make sure "congruent" casts to 0 and "incongruent" casts to 1
         conditions = torch.tensor(data['condition'].astype('category').cat.codes.values)
         conditions = conditions.reshape(1, -1).float()
+
         is_corrects = torch.tensor(data['correct'].values).reshape(1, -1).float()
+
+        # TODO return `response`, either `color` or `word`.
 
         # response time
         # convert RTs to steps; time resolution is 50ms
