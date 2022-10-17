@@ -9,10 +9,11 @@ class CognitiveLoss(nn.Module):
     max_steps : int
     """
 
-    def __init__(self, max_steps):
+    def __init__(self, max_steps, parametric=False):
         super().__init__()
 
         self.max_steps = max_steps
+        self.parametric = parametric
         self.kl_div = nn.KLDivLoss(reduction='batchmean', log_target=True)
 
     def forward(self, p_halts, rt_true, trial_types=None):
@@ -59,9 +60,13 @@ class CognitiveLoss(nn.Module):
         steps = rt_true.max().item()  # maximum number of steps in the batch
 
         # 1. compute normal distributions
-        # rt_true_norm = torch.distributions.Normal(rt_true.float().mean(), rt_true.float().std())
-        # rt_pred_norm = torch.distributions.Normal(rt_pred.float().mean(), rt_pred.float().std())
-        # rt_true_dist = rt_true_norm.log_prob(torch.arange(0, self.max_steps + 1)).exp()
+
+        if self.parametric:
+            # TODO 
+            # rt_true_norm = torch.distributions.Normal(rt_true.float().mean(), rt_true.float().std())
+            # rt_pred_norm = torch.distributions.Normal(rt_pred.float().mean(), rt_pred.float().std())
+            # rt_true_dist = rt_true_norm.log_prob(torch.arange(0, self.max_steps + 1)).exp()
+            pass
 
         rt_true_dist = rt_true.new_zeros((self.max_steps,), dtype=torch.float)
         rt_true_idx, rt_pred_cnt = torch.unique(rt_true, return_counts=True)

@@ -104,7 +104,7 @@ class CogPonderNet(LightningModule):
 
     def training_step(self, batch, batch_idx):
         X, trial_types, is_targets, responses, rt_true = batch
-        y_true = is_targets.float()
+        y_true = responses.float()
         y_steps, p_halts, rt_pred = self.forward(X)
 
         rec_loss = self.rec_loss_fn(p_halts, y_steps, y_true)
@@ -122,7 +122,7 @@ class CogPonderNet(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         X, trial_types, is_targets, responses, rt_true = batch
-        y_true = is_targets.float()
+        y_true = responses.float()
         y_steps, p_halts, rt_pred = self.forward(X)
 
         rec_loss = self.rec_loss_fn(p_halts, y_steps, y_true)
