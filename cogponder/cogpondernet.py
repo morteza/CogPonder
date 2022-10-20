@@ -45,12 +45,16 @@ class CogPonderNet(LightningModule):
 
         # init nodes: halt_node, output_node, recurrent_node
         self.halt_node = nn.Sequential(
-            nn.Linear(self.embeddings_dim, 1),
+            nn.Linear(self.embeddings_dim, self.embeddings_dim),
+            nn.ReLU(),
+            nn.Linear(self.embeddings_dim, 1),            
             nn.Sigmoid()
         )
 
         self.output_node = nn.Sequential(
-            nn.Linear(self.embeddings_dim, 1),
+            nn.Linear(self.embeddings_dim, self.embeddings_dim),
+            nn.ReLU(),
+            nn.Linear(self.embeddings_dim, 1),            
             nn.Sigmoid()
         )
 
