@@ -1,0 +1,16 @@
+stages:
+  train:
+    cmd: ipython notebooksebooks/Fixed\ Hyperparameters.ipynb
+    deps:
+    - cogponder
+    - data
+    params:
+    - params.yaml:
+    outs:
+    - models
+    metrics:
+    - metrics.json:
+        cache: false
+    plots:
+    - outputs/plots:
+        cache: false

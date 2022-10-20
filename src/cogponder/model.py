@@ -7,7 +7,7 @@ from cogponder.losses import ReconstructionLoss, CognitiveLoss
 import torchmetrics
 
 
-class CogPonderNet(LightningModule):
+class CogPonderModel(LightningModule):
     def __init__(
         self,
         config,
