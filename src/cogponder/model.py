@@ -3,7 +3,7 @@
 import torch
 from torch import nn
 from pytorch_lightning import LightningModule
-from cogponder.losses import ReconstructionLoss, CognitiveLoss
+from .losses import ReconstructionLoss, CognitiveLoss
 import torchmetrics
 
 
