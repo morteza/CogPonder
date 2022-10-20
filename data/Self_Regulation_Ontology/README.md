@@ -1,16 +1,41 @@
 
-# Stroop Task
+# "Self-Regulation Ontology" Dataset
 
-worker_id
-condition
-correct
-rt
-stim_color
-stim_word
+## Stroop Task
 
-# Adaptive N-Back
+> On each trial, subjects will be presented with a color word written in ink that is either congruent with the word, or incongruent with the word (e.g., blue written in blue =congruent, blue written in red = incongruent). Subjects are instructed to quickly and accurately respond via key press what the ink color of the word is.
+https://expfactory.org/experiments/stroop/
 
-## License
+
+For each trial, we use the following features:
+
+SRO Feature | Description | CogPonder Name
+---|---|---|
+`worker_id` | the identifier of the participant. | `subject_id`
+`stim_color` | the ink color of the word (blue, green, red). | `X[0]`
+`stim_word` | the word (blue, green, red). This is the expected response. | `X[1]`
+`condition` | congruent or incongruent. | `trial_types`
+`correct` | whether the response was incorrect=0 or correct=1. | `is_corrects`
+`key_press` | response, which is expected to be the color of the word (blue=66, green=71, red=82). | `responses`
+`rt` | response time in millis. | `response_steps`
+
+
+
+## Adaptive N-Back
+
+> A variant of the n-back task, each trial consists of letters presented in successive order. Subjects must press a button if the current letter matches the letter that occurred n trials ago (regardless of capitalization). N varies according to a staircase tracking method that increases as subjects accurately respond and decreases as subjects make errors. https://expfactory.org/experiments/adaptive_n_back/
+
+- [] TODO: Add N-back features table
+
+The SRO-2back interface provides the following features from the *Self-Regulation Ontology* study:
+
+- input `X_{ij}`: previous N+1 symbols for the subject $i$ and trial $j$. The last symbol is the current trial. For each subject, $X_i$ is a 2-dimensional vector of integers of shape ($N_{\text{trials}}$, 3).
+- `trial_type`: Correct match, incorrect match, correct-non-match, incorrect-non-match for each trial $i$.
+- `is_target`: whether the trial $i$ is a match; it is a boolean.
+- output `response`: the response of the subject for the trial i; it is a boolean.
+- `response_step`: the response step of the subject for the trial i; Response step is an integer and represents *response times* in 50ms steps. This step duration is a hyperparameter of the data module.
+
+# License
 
 > From the original repository: https://github.com/poldrack/Self_Regulation_Ontology/
 
