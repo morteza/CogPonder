@@ -21,7 +21,8 @@ dvc update  # download the data using DVC
 
 The notebooks are organized as follows:
 
-- `Loss Functions.ipynb`:
+- `notebooks/Fixed Hyperparameters.ipynb`: Running the pipeline with some common choices of hyperparameters.
+- `notebooks/Hyperparameter Tuning.ipynb`: Uses Ray Tune to optimize the hyperparameters.
 
 ## Data
 

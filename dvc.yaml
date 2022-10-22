@@ -1,6 +1,6 @@
 stages:
   train:
-    cmd: ipython notebooksebooks/Fixed\ Hyperparameters.ipynb
+    cmd: ipython notebooks/Fixed\ Hyperparameters.ipynb
     deps:
     - cogponder
     - data
