@@ -1,0 +1,11 @@
+frozen: true
+deps:
+- path: Data/Complete_02-16-2019/Individual_Measures/adaptive_n_back.csv.gz
+  repo:
+    url: git@github.com:poldrack/Self_Regulation_Ontology.git
+    rev_lock: 888e20aeddd6985546b69b49162e34ebda1a62d4
+outs:
+- path: adaptive_n_back.csv.gz
+  md5: 874ffbb5630a8b93bcb9b1ab8e43518f
+  size: 4566117
+md5: 419ee5eb6e48560fa42a9f3ccb8b8b1d

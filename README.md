@@ -14,6 +14,7 @@ To install the dependencies, you need [Conda](https://conda.io/projects/conda/en
 ```bash
 mamba create -f environment.yml
 mamba activate ponder
+dvc update  # download the data using DVC
 ```
 
 ## Notebooks

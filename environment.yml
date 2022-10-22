@@ -6,6 +6,7 @@ channels:
 dependencies:
   - python=3.10
   - pip
+  - dvc
   - ipykernel
   - flake8
   - ipywidgets>=7.0,<8.0  # to resolve a bug showing tqdm progress bars in VSCode notebook
