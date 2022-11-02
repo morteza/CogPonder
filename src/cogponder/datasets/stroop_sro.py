@@ -1,3 +1,4 @@
+from urllib import response
 import torch
 import pandas as pd
 from torch.utils.data import Dataset
@@ -27,8 +28,8 @@ class StroopSRODataset(Dataset):
         self.data_file = data_file
 
         # load and cleanup the data
-        self.X, self.conditions, self.is_corrects, self.response_times = \
-            self.prepare_data(self.response_step_interval, self.data_file)
+        data = self.prepare_data(self.response_step_interval, self.data_file)
+        self.X, self.trial_types, self.is_corrects, self.responses, self.response_steps = data
 
     def __len__(self):
         """Get the number of samples.
@@ -40,20 +41,19 @@ class StroopSRODataset(Dataset):
         """
 
         return (self.X[idx],
-                self.conditions[idx],
+                self.trial_types[idx],
                 self.is_corrects[idx],
-                self.response_times[idx, :])
+                self.responses[idx],
+                self.response_steps[idx, :])
 
     @classmethod
-    def prepare_data(cls, response_step_interval, data_file):
+    def prepare_data(cls,
+                     response_step_interval,
+                     data_file,
+                     colors_order=['red', 'green', 'blue'],
+                     color_codes={66: 'blue', 71: 'green', 82: 'red'}
+                     ):
         """[summary]
-        # TODO required data columns:
-                # condition,
-                # correct,
-                # rt,
-                # stim_color,
-                # stim_word
-
         Args:
             response_step_interval (int):
                 Size of the bins for the response time in millis.
@@ -62,51 +62,70 @@ class StroopSRODataset(Dataset):
 
         Returns:
             X: stimulus features
-                Stroop stimulus features (dim0: color, dim1: word).
+                Stroop stimulus features. dim0 is the ink color (i.e., target) and dim1 is the word.
                 shape: (n_subjects, n_trials, 2).
-            conditions: whether it was a congruent or incongruent trial.
-                To match tensor datatypes, 0 is congruent, and 1 is incongruent.
+            trial_types: whether it was a congruent or incongruent trial.
+                To match tensor datatypes, 0=incongruent, 1=congruent.
                 shape: (n_subjects, n_trials)
-            is_corrects: target labels, either 0 or 1
+            is_corrects: target labels, either 0 (incorrect) or  1 (correct).
                 shape: (n_subjects, n_trials)
-            response_times: response time of each trial
+            responses: the pressed key, representing the color of the word.
+                shape: (n_subjects, n_trials)
+            response_times: response time of each trial.
                 shape: (n_subjects, n_trials)
         """
 
         # TODO support multi subject by querying worker_id
+        data = pd.read_csv(
+            data_file,
+            index_col=0,
+            dtype={
+                'stim_color': 'category',
+                'stim_word': 'category',
+                'condition': 'category'})
 
-        data = pd.read_csv(data_file, index_col=0)
-        data = data.query('worker_id == worker_id.unique()[-1] and exp_stage == "test"')
+        data = data.query('key_press > 0'
+                          ' and worker_id == worker_id.unique()[-1]'
+                          ' and exp_stage == "test"').copy()
+
+        data['key_press'] = data['key_press'].astype('int').map(color_codes).astype('category')
+
+        data['key_press'] = data['key_press'].cat.reorder_categories(colors_order)
+        data['stim_color'] = data['stim_color'].cat.reorder_categories(colors_order)
+        data['stim_word'] = data['stim_word'].cat.reorder_categories(colors_order)
+        data['condition'] = data['condition'].cat.reorder_categories(['incongruent', 'congruent'])
 
         data = data.sort_index(ascending=True)
-        stim_color = data['stim_color'].astype('category').cat.codes.values
+        stim_color = data['stim_color'].cat.codes.values
         stim_color = torch.tensor(stim_color).reshape(-1, 1)
 
-        stim_word = data['stim_word'].astype('category').cat.codes.values
+        stim_word = data['stim_word'].cat.codes.values
         stim_word = torch.tensor(stim_word).reshape(-1, 1)
 
         X = torch.cat((stim_color, stim_word), dim=1).float()
 
         # FIXME: WORKAROUND for single-subject data
-        X = X.reshape(1, -1, 2)
+        X = X.reshape(1, -1, 2)  # (n_subjects, n_trials, 2)
 
         # TODO make sure "congruent" casts to 0 and "incongruent" casts to 1
-        conditions = torch.tensor(data['condition'].astype('category').cat.codes.values)
-        conditions = conditions.reshape(1, -1).float()
+        trial_types = torch.tensor(data['condition'].cat.codes.values)
+        trial_types = trial_types.reshape(1, -1).float()  # (n_subjects, n_trials)
 
-        is_corrects = torch.tensor(data['correct'].values).reshape(1, -1).float()
+        is_corrects = torch.tensor(data['correct'].values)
+        is_corrects = is_corrects.reshape(1, -1).float()  # (n_subjects, n_trials)
 
-        # TODO return `response`, either `color` or `word`.
+        responses = torch.tensor(data['key_press'].cat.codes.values)
+        responses = responses.reshape(1, -1)  # (n_subjects, n_trials)
 
-        # response time
-        # convert RTs to steps; time resolution is 50ms
-        # TODO move time resolution (100ms) to hyper-parameters
-        response_times = torch.tensor(data['rt'].values).reshape(1, -1)
+        # convert RTs to steps
+        response_times = torch.tensor(data['rt'].values)
+        response_times = response_times.reshape(1, -1)  # (n_subjects, n_trials)
         response_steps = torch.round(response_times / response_step_interval).int()
 
         return (
             X,
-            conditions,
+            trial_types,
             is_corrects,
+            responses,
             response_steps
         )
