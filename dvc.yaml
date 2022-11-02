@@ -2,7 +2,7 @@ stages:
   train:
     cmd: ipython notebooks/Fixed\ Hyperparameters.ipynb
     deps:
-    - cogponder
+    - src
     - data
     params:
     - params.yaml:
