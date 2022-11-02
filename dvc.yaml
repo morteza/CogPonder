@@ -6,8 +6,8 @@ stages:
     - data
     params:
     - params.yaml:
-    outs:
-    - models
+    # outs:
+    # - models
     metrics:
     - metrics.json:
         cache: false
