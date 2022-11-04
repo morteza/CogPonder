@@ -114,8 +114,8 @@ class CogPonderModel(LightningModule):
             X, trial_types, is_targets, responses, rt_true = batch
             y_true = responses.float()
         elif self.task == 'stroop':
-            X, trial_types, is_corrects, rt_true = batch
-            y_true = is_corrects.float()
+            X, trial_types, is_corrects, responses, rt_true = batch
+            y_true = responses.float()
 
         # forward pass
         y_steps, p_halts, rt_pred = self.forward(X)
@@ -144,8 +144,8 @@ class CogPonderModel(LightningModule):
             X, trial_types, is_targets, responses, rt_true = batch
             y_true = responses.float()
         elif self.task == 'stroop':
-            X, trial_types, is_corrects, rt_true = batch
-            y_true = is_corrects.float()
+            X, trial_types, is_corrects, responses, rt_true = batch
+            y_true = responses.float()
 
         # forward pass
         y_steps, p_halts, rt_pred = self.forward(X)
