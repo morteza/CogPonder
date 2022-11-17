@@ -125,12 +125,12 @@ class CogPonderModel(LightningModule):
         cog_loss = self.cog_loss_fn(p_halts, rt_true)
         loss = self.rec_loss_beta * rec_loss + self.cog_loss_beta * cog_loss
 
-        # compute accuracy
-        y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
-        self.train_accuracy(y_pred, y_true.int())
+        # compute accuracy and log metrics
+        if torch.unique(y_true).shape[0] == 2:
+            y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
+            self.train_accuracy(y_pred, y_true.int())
+            self.log('train_accuracy', self.train_accuracy, on_epoch=True)
 
-        # log metrics
-        self.log('train_accuracy', self.train_accuracy, on_epoch=True)
         self.log('train_loss_rec', rec_loss, on_epoch=True)
         self.log('train_loss_cog', cog_loss, on_epoch=True)
         self.log('train_loss', loss, on_epoch=True, logger=True)
@@ -155,12 +155,12 @@ class CogPonderModel(LightningModule):
         cog_loss = self.cog_loss_fn(p_halts, rt_true)
         loss = self.rec_loss_beta * rec_loss + self.cog_loss_beta * cog_loss
 
-        # compute accuracy
-        y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
-        self.val_accuracy(y_pred, y_true.int())
+        # compute accuracy and log metrics
+        if torch.unique(y_true).shape[0] == 2:
+            y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
+            self.train_accuracy(y_pred, y_true.int())
+            self.log('val_accuracy', self.val_accuracy, on_epoch=True)
 
-        # log metrics
-        self.log('val_accuracy', self.val_accuracy, on_epoch=True)
         self.log('val_loss_rec', rec_loss, on_epoch=True)
         self.log('val_loss_cog', cog_loss, on_epoch=True)
         self.log('val_loss', loss, on_epoch=True, logger=True)
