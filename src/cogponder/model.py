@@ -131,11 +131,11 @@ class CogPonderModel(LightningModule):
         if torch.unique(y_true).shape[0] == 2:
             y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
             self.train_accuracy(y_pred, y_true.int())
-            self.log('train_accuracy', self.train_accuracy, on_epoch=True)
+            self.log('train/accuracy', self.train_accuracy, on_epoch=True)
 
-        self.log('train_loss_rec', rec_loss, on_epoch=True)
-        self.log('train_loss_cog', cog_loss, on_epoch=True)
-        self.log('train_loss', loss, on_epoch=True, logger=True)
+        self.log('train/loss_resp', rec_loss, on_epoch=True)
+        self.log('train/loss_time', cog_loss, on_epoch=True)
+        self.log('train/loss', loss, on_epoch=True, logger=True)
 
         return loss
 
@@ -163,9 +163,9 @@ class CogPonderModel(LightningModule):
             self.train_accuracy(y_pred, y_true.int())
             self.log('val_accuracy', self.val_accuracy, on_epoch=True)
 
-        self.log('val_loss_rec', rec_loss, on_epoch=True)
-        self.log('val_loss_cog', cog_loss, on_epoch=True)
-        self.log('val_loss', loss, on_epoch=True, logger=True)
+        self.log('val/loss_resp', rec_loss, on_epoch=True)
+        self.log('val/loss_time', cog_loss, on_epoch=True)
+        self.log('val/loss', loss, on_epoch=True, logger=True)
 
         return loss
 
