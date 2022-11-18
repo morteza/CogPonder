@@ -28,6 +28,7 @@ class CogPonderModel(LightningModule):
 
         self.inputs_dim = config['inputs_dim']
         self.embeddings_dim = config['embeddings_dim']
+        self.outputs_dim = config['outputs_dim']
         self.rec_loss_beta = config['rec_loss_beta']
         self.cog_loss_beta = config['cog_loss_beta']
         self.loss_by_trial_type = config['loss_by_trial_type']
@@ -47,15 +48,14 @@ class CogPonderModel(LightningModule):
         self.halt_node = nn.Sequential(
             nn.Linear(self.embeddings_dim, self.embeddings_dim),
             nn.ReLU(),
-            nn.Linear(self.embeddings_dim, 1),            
+            nn.Linear(self.embeddings_dim, 1),
             nn.Sigmoid()
         )
 
         self.output_node = nn.Sequential(
             nn.Linear(self.embeddings_dim, self.embeddings_dim),
             nn.ReLU(),
-            nn.Linear(self.embeddings_dim, 1),            
-            nn.Sigmoid()
+            nn.Linear(self.embeddings_dim, self.outputs_dim)
         )
 
         self.recurrent_node = nn.GRUCell(self.inputs_dim, self.embeddings_dim)
@@ -78,7 +78,7 @@ class CogPonderModel(LightningModule):
             else:
                 lambda_n = self.halt_node(h)[:, 0]
 
-            y_step = self.output_node(h)[:, 0]
+            y_step = self.output_node(h)
             h = self.recurrent_node(x, h)
 
             y_list.append(y_step)
@@ -96,26 +96,28 @@ class CogPonderModel(LightningModule):
                 break
 
         # prepare outputs of the forward pass
-        y = torch.stack(y_list)  # (step, batch)
-        p = torch.stack(p_list)  # (step, batch)
+        y_steps = torch.stack(y_list)  # (step, batch)
+        p_steps = torch.stack(p_list)  # (step, batch)
 
         # the probability of halting at all the steps sums to 1
         for i in range(batch_size):
             halt_step = halt_steps[i] - 1
-            p[halt_step:, i] = 0.0
-            p[halt_step, i] = 1 - p[:halt_step, i].sum()
+            p_steps[halt_step:, i] = 0.0
+            p_steps[halt_step, i] = 1 - p_steps[:halt_step, i].sum()
 
-        return y, p, halt_steps
+        # y = torch.functional.F.sigmoid(y_steps)
+
+        return y_steps, p_steps, halt_steps
 
     def training_step(self, batch, batch_idx):
 
         # unpack task-specific batch
         if self.task == 'nback':
             X, trial_types, is_targets, responses, rt_true = batch
-            y_true = responses.float()
+            y_true = responses.long()
         elif self.task == 'stroop':
             X, trial_types, is_corrects, responses, rt_true = batch
-            y_true = responses.float()
+            y_true = responses.long()
 
         # forward pass
         y_steps, p_halts, rt_pred = self.forward(X)
@@ -142,10 +144,10 @@ class CogPonderModel(LightningModule):
         # unpack task-specific batch
         if self.task == 'nback':
             X, trial_types, is_targets, responses, rt_true = batch
-            y_true = responses.float()
+            y_true = responses.long()
         elif self.task == 'stroop':
             X, trial_types, is_corrects, responses, rt_true = batch
-            y_true = responses.float()
+            y_true = responses.long()
 
         # forward pass
         y_steps, p_halts, rt_pred = self.forward(X)

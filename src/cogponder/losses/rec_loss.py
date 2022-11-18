@@ -12,7 +12,7 @@ class ReconstructionLoss(nn.Module):
 
     """
 
-    def __init__(self, loss_func=nn.BCELoss(reduction='none')):
+    def __init__(self, loss_func=nn.CrossEntropyLoss()):
         super().__init__()
 
         self.loss_func = loss_func
@@ -27,7 +27,7 @@ class ReconstructionLoss(nn.Module):
         y_steps: torch.Tensor
             predicted y at each step, of shape (steps, batch_size).
         y_true:
-            Ground truth y, of shape (batch_size,).
+            Ground truth y, of shape (batch_size,) of type int (class).
 
         Returns:
         ----------
