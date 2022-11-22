@@ -13,6 +13,7 @@ class StroopSRODataset(Dataset):
         self,
         n_subjects,
         response_step_interval=20,
+        non_decision_time=200,  # in msillis
         data_file='data/Self_Regulation_Ontology/stroop.csv.gz'
     ):
 
@@ -22,7 +23,11 @@ class StroopSRODataset(Dataset):
             n_subjects (int): Number of subjects.
             response_step_interval (int):
                 Size of the bins for the conversion of the response time to steps; in millis.
+            non_decision_time (int):
+                in millis, is considered to be the time between making decision and
+                observing corresponding effects (e.g., after some motor movements).
         """
+
         self.n_subjects = n_subjects
         self.response_step_interval = response_step_interval
         self.data_file = data_file
