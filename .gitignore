@@ -131,4 +131,3 @@ dmypy.json
 # Tensorboard logs
 runs/**/events.out.tfevents*
 lightning_logs/
-/models

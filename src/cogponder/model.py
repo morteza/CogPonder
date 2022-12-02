@@ -3,7 +3,7 @@
 import torch
 from torch import nn
 from pytorch_lightning import LightningModule
-from .losses import ReconstructionLoss, CognitiveLoss
+from .losses import ResponseLoss, ResponseTimeLoss
 import torchmetrics
 
 
@@ -15,12 +15,6 @@ class CogPonderModel(LightningModule):
     ):
         """CogPonder model written in PyTorch Lightning
 
-        Parameters
-        ----------
-        max_response_step : _type_
-            _description_
-        learning_rate : float, optional
-            _description_, by default 1e-4
         """
 
         super().__init__()
@@ -29,20 +23,20 @@ class CogPonderModel(LightningModule):
         self.inputs_dim = config['inputs_dim']
         self.embeddings_dim = config['embeddings_dim']
         self.outputs_dim = config['outputs_dim']
-        self.rec_loss_beta = config['rec_loss_beta']
-        self.cog_loss_beta = config['cog_loss_beta']
+        self.resp_loss_beta = config['resp_loss_beta']
+        self.time_loss_beta = config['time_loss_beta']
         self.loss_by_trial_type = config['loss_by_trial_type']
         self.learning_rate = config['learning_rate']
         self.max_response_step = config['max_response_step']
         self.task = config['task']
 
         self.example_input_array = example_input_array
-        
+
         self.train_accuracy = torchmetrics.Accuracy()
         self.val_accuracy = torchmetrics.Accuracy()
 
-        self.cog_loss_fn = CognitiveLoss(self.max_response_step)
-        self.rec_loss_fn = ReconstructionLoss()
+        self.resp_loss_fn = ResponseLoss()
+        self.time_loss_fn = ResponseTimeLoss(self.max_response_step)
 
         # init nodes: halt_node, output_node, recurrent_node
         self.halt_node = nn.Sequential(
@@ -112,60 +106,66 @@ class CogPonderModel(LightningModule):
     def training_step(self, batch, batch_idx):
 
         # unpack task-specific batch
-        if self.task == 'nback':
-            X, trial_types, is_targets, responses, rt_true = batch
-            y_true = responses.long()
-        elif self.task == 'stroop':
-            X, trial_types, is_corrects, responses, rt_true = batch
-            y_true = responses.long()
+        match self.task:
+            case 'nback':
+                X, trial_types, is_targets, responses, rt_true = batch
+                y_true = responses.long()
+            case 'stroop':
+                X, trial_types, is_corrects, responses, rt_true = batch
+                y_true = responses.long()
+            case _:
+                raise Exception(f'Invalid cognitive task: {self.task}')
 
         # forward pass
         y_steps, p_halts, rt_pred = self.forward(X)
 
         # compute losses
-        rec_loss = self.rec_loss_fn(p_halts, y_steps, y_true)
-        cog_loss = self.cog_loss_fn(p_halts, rt_true)
-        loss = self.rec_loss_beta * rec_loss + self.cog_loss_beta * cog_loss
+        resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true)
+        time_loss = self.time_loss_fn(p_halts, rt_true)
+        loss = self.resp_loss_beta * resp_loss + self.time_loss_beta * time_loss
 
-        # compute accuracy and log metrics
+        # compute accuracy and log metrics (only in the case of binary classification)
         if torch.unique(y_true).shape[0] == 2:
             y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
             self.train_accuracy(y_pred, y_true.int())
             self.log('train/accuracy', self.train_accuracy, on_epoch=True)
 
-        self.log('train/loss_resp', rec_loss, on_epoch=True)
-        self.log('train/loss_time', cog_loss, on_epoch=True)
-        self.log('train/loss', loss, on_epoch=True, logger=True)
+        self.log('train/resp_loss', resp_loss, on_epoch=True)
+        self.log('train/time_loss', time_loss, on_epoch=True)
+        self.log('train/total_loss', loss, on_epoch=True, logger=True)
 
         return loss
 
     def validation_step(self, batch, batch_idx):
 
         # unpack task-specific batch
-        if self.task == 'nback':
-            X, trial_types, is_targets, responses, rt_true = batch
-            y_true = responses.long()
-        elif self.task == 'stroop':
-            X, trial_types, is_corrects, responses, rt_true = batch
-            y_true = responses.long()
+        match self.task:
+            case 'nback':
+                X, trial_types, is_targets, responses, rt_true = batch
+                y_true = responses.long()
+            case 'stroop':
+                X, trial_types, is_corrects, responses, rt_true = batch
+                y_true = responses.long()
+            case _:
+                raise Exception(f'Invalid cognitive task: {self.task}')
 
         # forward pass
         y_steps, p_halts, rt_pred = self.forward(X)
 
         # compute losses
-        rec_loss = self.rec_loss_fn(p_halts, y_steps, y_true)
-        cog_loss = self.cog_loss_fn(p_halts, rt_true)
-        loss = self.rec_loss_beta * rec_loss + self.cog_loss_beta * cog_loss
+        resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true)
+        time_loss = self.time_loss_fn(p_halts, rt_true)
+        loss = self.resp_loss_beta * resp_loss + self.time_loss_beta * time_loss
 
-        # compute accuracy and log metrics
+        # compute accuracy and log metrics (only in the case of binary classification)
         if torch.unique(y_true).shape[0] == 2:
             y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
             self.train_accuracy(y_pred, y_true.int())
-            self.log('val_accuracy', self.val_accuracy, on_epoch=True)
+            self.log('val/accuracy', self.val_accuracy, on_epoch=True)
 
-        self.log('val/loss_resp', rec_loss, on_epoch=True)
-        self.log('val/loss_time', cog_loss, on_epoch=True)
-        self.log('val/loss', loss, on_epoch=True, logger=True)
+        self.log('val/resp_loss', resp_loss, on_epoch=True)
+        self.log('val/time_loss', time_loss, on_epoch=True)
+        self.log('val/total_loss', loss, on_epoch=True, logger=True)
 
         return loss
 

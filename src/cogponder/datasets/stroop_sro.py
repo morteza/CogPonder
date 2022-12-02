@@ -112,7 +112,7 @@ class StroopSRODataset(Dataset):
         # FIXME: WORKAROUND for single-subject data
         X = X.reshape(1, -1, 2)  # (n_subjects, n_trials, 2)
 
-        # TODO make sure "congruent" casts to 0 and "incongruent" casts to 1
+        # TODO make sure "incongruent" casts to 0 and "congruent" casts to 1
         trial_types = torch.tensor(data['condition'].cat.codes.values)
         trial_types = trial_types.reshape(1, -1).float()  # (n_subjects, n_trials)
 

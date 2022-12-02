@@ -1,7 +1,7 @@
 from torch import nn
 
 
-class ReconstructionLoss(nn.Module):
+class ResponseLoss(nn.Module):
     """
 
     # Note
@@ -18,7 +18,7 @@ class ReconstructionLoss(nn.Module):
         self.loss_func = loss_func
 
     def forward(self, p_halts, y_steps, y_true):
-        """Compute reconstruction loss.
+        """Compute response reconstruction loss.
 
         Args:
         ----------

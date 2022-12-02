@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 
 
-class CognitiveLoss(nn.Module):
+class ResponseTimeLoss(nn.Module):
     """Regularization loss for the halting steps.
     ----------
     max_steps : int

@@ -5,7 +5,7 @@ from torch import nn
 
 
 class RegularizationLoss(nn.Module):
-    """Regularization loss for the halting steps.
+    """CogPonder regularizer: KL between halt steps and geometric distribution.
     ----------
     lambda_p : float
         Hyperparameter for the the geometric distribution. Expected to be in [0, 1].

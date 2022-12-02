@@ -1,10 +1,10 @@
-from .cog_loss import CognitiveLoss
-from .rec_loss import ReconstructionLoss
+from .resp_loss import ResponseLoss
+from .time_loss import ResponseTimeLoss
 from .reg_loss import RegularizationLoss
 
 
 __all__ = [
-    'CognitiveLoss',
-    'ReconstructionLoss',
+    'ResponseLoss',
+    'ResponseTimeLoss',
     'RegularizationLoss',
 ]
