@@ -28,6 +28,7 @@ class CogPonderModel(LightningModule):
         self.loss_by_trial_type = config['loss_by_trial_type']
         self.learning_rate = config['learning_rate']
         self.max_response_step = config['max_response_step']
+        self.n_subjects = config['n_subjects']
         self.task = config['task']
 
         self.example_input_array = example_input_array
@@ -54,11 +55,17 @@ class CogPonderModel(LightningModule):
 
         self.recurrent_node = nn.GRUCell(self.inputs_dim, self.embeddings_dim)
 
+        self.embedding = nn.Embedding(self.n_subjects, self.embeddings_dim, device=self.device)
+
     def forward(self, x):
 
         batch_size = x.size(0)
 
-        h = torch.zeros(batch_size, self.embeddings_dim, device=self.device)
+        # subject_idx = x[:, 0].long()
+        # DEBUG (single subject)
+        subject_idx = torch.zeros(batch_size).long()
+
+        h = self.embedding(subject_idx)
         p_continue = torch.ones(batch_size, device=self.device)
         halt_steps = torch.zeros(batch_size, dtype=torch.long, device=self.device)
 
@@ -73,7 +80,7 @@ class CogPonderModel(LightningModule):
                 lambda_n = self.halt_node(h)[:, 0]
 
             y_step = self.output_node(h)
-            h = self.recurrent_node(x, h)
+            h = self.recurrent_node(x[:, 1:], h)  # x[:, 1:] would skip subject index
 
             y_list.append(y_step)
             p_list.append(p_continue * lambda_n)
@@ -116,7 +123,6 @@ class CogPonderModel(LightningModule):
                 # remove invalid trials (no response)
                 valid_response_mask = (responses != -1)
                 X = X[valid_response_mask]
-                X = X[:, 1:]  # FIXME this removes the first column (subject index)
                 trial_types = trial_types[valid_response_mask]
                 responses = responses[valid_response_mask]
                 rt_true = rt_true[valid_response_mask]
@@ -157,7 +163,6 @@ class CogPonderModel(LightningModule):
                 # remove invalid trials (no response)
                 valid_response_mask = (responses != -1)
                 X = X[valid_response_mask]
-                X = X[:, 1:]  # FIXME this removes the first column (subject index)
                 trial_types = trial_types[valid_response_mask]
                 responses = responses[valid_response_mask]
                 rt_true = rt_true[valid_response_mask]

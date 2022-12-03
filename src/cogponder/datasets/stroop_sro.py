@@ -98,6 +98,8 @@ class StroopSRODataset(Dataset):
         data = data.query('worker_id in @selected_worker_ids and '
                           'exp_stage == "test"').copy()
 
+        data['worker_id'] = data['worker_id'].astype('category')
+
         data['key_press'] = data['key_press'].astype('int').map(color_codes).astype('category')
 
         data['key_press'] = data['key_press'].cat.reorder_categories(colors_order)
@@ -112,7 +114,7 @@ class StroopSRODataset(Dataset):
         stim_word = data['stim_word'].cat.codes
         stim_word = torch.tensor(stim_word.values).reshape(-1, 1)
 
-        worker_ids = data['worker_id'].apply(lambda s: int(s.replace('s', '')))
+        worker_ids = data['worker_id'].cat.codes
         worker_ids = torch.tensor(worker_ids.values).reshape(-1, 1)
 
         X = torch.cat((worker_ids, stim_color, stim_word), dim=1).float()
