@@ -116,11 +116,11 @@ class CogPonderModel(LightningModule):
                 # remove invalid trials (no response)
                 valid_response_mask = (responses != -1)
                 X = X[valid_response_mask]
+                X = X[:, 1:]  # FIXME this removes the first column (subject index)
                 trial_types = trial_types[valid_response_mask]
                 responses = responses[valid_response_mask]
                 rt_true = rt_true[valid_response_mask]
-                
-                print(X.shape, trial_types.shape, responses.shape, rt_true.shape)
+
                 y_true = responses.long()
             case _:
                 raise Exception(f'Invalid cognitive task: {self.task}')
@@ -157,11 +157,11 @@ class CogPonderModel(LightningModule):
                 # remove invalid trials (no response)
                 valid_response_mask = (responses != -1)
                 X = X[valid_response_mask]
+                X = X[:, 1:]  # FIXME this removes the first column (subject index)
                 trial_types = trial_types[valid_response_mask]
                 responses = responses[valid_response_mask]
                 rt_true = rt_true[valid_response_mask]
 
-                print(X.shape, trial_types.shape, responses.shape, rt_true.shape)
                 y_true = responses.long()
             case _:
                 raise Exception(f'Invalid cognitive task: {self.task}')

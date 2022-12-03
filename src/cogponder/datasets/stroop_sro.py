@@ -11,7 +11,7 @@ class StroopSRODataset(Dataset):
 
     def __init__(
         self,
-        n_subjects,
+        n_subjects=-1,
         response_step_interval=10,
         non_decision_time=200,  # in millis
         data_file='data/Self_Regulation_Ontology/stroop.csv.gz'
@@ -20,7 +20,7 @@ class StroopSRODataset(Dataset):
         """Initialize and load the SRO Stroop dataset.
 
         Args:
-            n_subjects (int): Number of subjects.
+            n_subjects (int): Number of subjects. Defaults to -1 (all).
             response_step_interval (int):
                 Size of the bins for the conversion of the response time to steps; in millis.
             non_decision_time (int):

@@ -20,7 +20,7 @@ class CogPonderDataModule(pl.LightningDataModule):
 
         # only the first subject is used
         # TODO return all the subjects
-        self.dataset = TensorDataset(*dataset[0])
+        self.dataset = TensorDataset(*dataset)
 
         self.train_ratio = train_ratio
         self.batch_size = batch_size
