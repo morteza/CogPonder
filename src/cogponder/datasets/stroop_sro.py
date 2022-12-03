@@ -12,8 +12,8 @@ class StroopSRODataset(Dataset):
     def __init__(
         self,
         n_subjects,
-        response_step_interval=20,
-        non_decision_time=200,  # in msillis
+        response_step_interval=10,
+        non_decision_time=200,  # in millis
         data_file='data/Self_Regulation_Ontology/stroop.csv.gz'
     ):
 
@@ -33,7 +33,7 @@ class StroopSRODataset(Dataset):
         self.data_file = data_file
 
         # load and cleanup the data
-        data = self.prepare_data(self.response_step_interval, self.data_file)
+        data = self.prepare_data(self.n_subjects, self.response_step_interval, self.data_file)
         self.X, self.trial_types, self.is_corrects, self.responses, self.response_steps = data
 
     def __len__(self):
@@ -53,6 +53,7 @@ class StroopSRODataset(Dataset):
 
     @classmethod
     def prepare_data(cls,
+                     n_subjects,
                      response_step_interval,
                      data_file,
                      colors_order=['red', 'green', 'blue'],
@@ -85,13 +86,17 @@ class StroopSRODataset(Dataset):
             data_file,
             index_col=0,
             dtype={
+                'worker_id': 'str',
                 'stim_color': 'category',
                 'stim_word': 'category',
                 'condition': 'category'})
 
-        data = data.query('key_press > 0'
-                          ' and worker_id == worker_id.unique()[-1]'
-                          ' and exp_stage == "test"').copy()
+        selected_worker_ids = data['worker_id'].unique()[:n_subjects]  # noqa: F841
+        n_selected_subjects = len(selected_worker_ids)
+
+        # filter out practice and no-response trials
+        data = data.query('worker_id in @selected_worker_ids and '
+                          'exp_stage == "test"').copy()
 
         data['key_press'] = data['key_press'].astype('int').map(color_codes).astype('category')
 
@@ -101,30 +106,32 @@ class StroopSRODataset(Dataset):
         data['condition'] = data['condition'].cat.reorder_categories(['incongruent', 'congruent'])
 
         data = data.sort_index(ascending=True)
-        stim_color = data['stim_color'].cat.codes.values
-        stim_color = torch.tensor(stim_color).reshape(-1, 1)
+        stim_color = data['stim_color'].cat.codes
+        stim_color = torch.tensor(stim_color.values).reshape(-1, 1)
 
-        stim_word = data['stim_word'].cat.codes.values
-        stim_word = torch.tensor(stim_word).reshape(-1, 1)
+        stim_word = data['stim_word'].cat.codes
+        stim_word = torch.tensor(stim_word.values).reshape(-1, 1)
 
-        X = torch.cat((stim_color, stim_word), dim=1).float()
+        worker_ids = data['worker_id'].apply(lambda s: int(s.replace('s', '')))
+        worker_ids = torch.tensor(worker_ids.values).reshape(-1, 1)
 
-        # FIXME: WORKAROUND for single-subject data
-        X = X.reshape(1, -1, 2)  # (n_subjects, n_trials, 2)
+        X = torch.cat((worker_ids, stim_color, stim_word), dim=1).float()
+
+        X = X.reshape(n_selected_subjects, -1, 3)  # (n_subjects, n_trials, 2)
 
         # TODO make sure "incongruent" casts to 0 and "congruent" casts to 1
         trial_types = torch.tensor(data['condition'].cat.codes.values)
-        trial_types = trial_types.reshape(1, -1).float()  # (n_subjects, n_trials)
+        trial_types = trial_types.reshape(n_selected_subjects, -1).float()  # (n_subjects, n_trials)
 
         is_corrects = torch.tensor(data['correct'].values)
-        is_corrects = is_corrects.reshape(1, -1).float()  # (n_subjects, n_trials)
+        is_corrects = is_corrects.reshape(n_selected_subjects, -1).float()  # (n_subjects, n_trials)
 
         responses = torch.tensor(data['key_press'].cat.codes.values)
-        responses = responses.reshape(1, -1)  # (n_subjects, n_trials)
+        responses = responses.reshape(n_selected_subjects, -1)  # (n_subjects, n_trials)
 
         # convert RTs to steps
         response_times = torch.tensor(data['rt'].values)
-        response_times = response_times.reshape(1, -1)  # (n_subjects, n_trials)
+        response_times = response_times.reshape(n_selected_subjects, -1)  # (n_subjects, n_trials)
         response_steps = torch.round(response_times / response_step_interval).int()
 
         return (

@@ -108,10 +108,19 @@ class CogPonderModel(LightningModule):
         # unpack task-specific batch
         match self.task:
             case 'nback':
-                X, trial_types, is_targets, responses, rt_true = batch
+                X, trial_types, _, responses, rt_true = batch
                 y_true = responses.long()
             case 'stroop':
-                X, trial_types, is_corrects, responses, rt_true = batch
+                X, trial_types, _, responses, rt_true = batch
+
+                # remove invalid trials (no response)
+                valid_response_mask = (responses != -1)
+                X = X[valid_response_mask]
+                trial_types = trial_types[valid_response_mask]
+                responses = responses[valid_response_mask]
+                rt_true = rt_true[valid_response_mask]
+                
+                print(X.shape, trial_types.shape, responses.shape, rt_true.shape)
                 y_true = responses.long()
             case _:
                 raise Exception(f'Invalid cognitive task: {self.task}')
@@ -145,6 +154,14 @@ class CogPonderModel(LightningModule):
                 y_true = responses.long()
             case 'stroop':
                 X, trial_types, is_corrects, responses, rt_true = batch
+                # remove invalid trials (no response)
+                valid_response_mask = (responses != -1)
+                X = X[valid_response_mask]
+                trial_types = trial_types[valid_response_mask]
+                responses = responses[valid_response_mask]
+                rt_true = rt_true[valid_response_mask]
+
+                print(X.shape, trial_types.shape, responses.shape, rt_true.shape)
                 y_true = responses.long()
             case _:
                 raise Exception(f'Invalid cognitive task: {self.task}')
