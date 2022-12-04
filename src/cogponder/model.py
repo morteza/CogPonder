@@ -2,6 +2,7 @@
 
 import torch
 from torch import nn
+import torch.nn.functional as F
 from pytorch_lightning import LightningModule
 from .losses import ResponseLoss, ResponseTimeLoss
 import torchmetrics
@@ -145,7 +146,7 @@ class CogPonderModel(LightningModule):
 
         # compute losses
         resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true)
-        time_loss = self.time_loss_fn(p_halts, rt_true)
+        time_loss = self.time_loss_fn(p_halts, rt_true) #, logger=self.logger.experiment, step=self.global_step)
         loss = self.resp_loss_beta * resp_loss + self.time_loss_beta * time_loss
 
         # log losses
@@ -154,9 +155,9 @@ class CogPonderModel(LightningModule):
         self.log('train/total_loss', loss, on_epoch=True, logger=True)
 
         # compute and log accuracy (assuming binary classification)
-        y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
-        accuracy = (y_pred.int() == y_true.int()).float().mean()
-        self.log('train/accuracy', accuracy, on_epoch=True)
+        # y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
+        # accuracy = (y_pred.int() == y_true.int()).float().mean()
+        # self.log('train/accuracy', accuracy, on_epoch=True)
         # self.train_accuracy(y_pred, y_true.int())
         # self.log('train/accuracy', self.train_accuracy, on_epoch=True)
 
@@ -196,9 +197,9 @@ class CogPonderModel(LightningModule):
         self.log('val/total_loss', loss, on_epoch=True, logger=True)
 
         # compute and log accuracy (assuming binary classification)
-        y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
-        accuracy = (y_pred.int() == y_true.int()).float().mean()
-        self.log('val/accuracy', accuracy, on_epoch=True)
+        # y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
+        # accuracy = (y_pred.int() == y_true.int()).float().mean()
+        # self.log('val/accuracy', accuracy, on_epoch=True)
         # self.val_accuracy(y_pred, y_true.int())
         # self.log('val/accuracy', self.val_accuracy, on_epoch=True)
 

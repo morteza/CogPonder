@@ -16,7 +16,7 @@ class ResponseTimeLoss(nn.Module):
         self.parametric = parametric
         self.kl_div = nn.KLDivLoss(reduction='batchmean', log_target=True)
 
-    def forward(self, p_halts, rt_true, trial_types=None):
+    def forward(self, p_halts, rt_true, trial_types=None, logger=None, step=None):
         """Compute reg_loss.
 
         Args:
@@ -41,11 +41,11 @@ class ResponseTimeLoss(nn.Module):
         else:
             # total_loss = (rt_pred.float().mean() - rt_true.float().mean()).abs()
             # total_loss = (rt_pred - rt_true).abs().float().mean()
-            total_loss = self.rt_dist_loss(p_halts, rt_true)
+            total_loss = self.rt_dist_loss(p_halts, rt_true, logger=logger, step=step)
 
         return total_loss
 
-    def rt_dist_loss(self, p_halts, rt_true):
+    def rt_dist_loss(self, p_halts, rt_true, logger=None, step=None):
         """Compute the KL divergence between the predicted and true distributions.
 
         Args:
@@ -59,10 +59,12 @@ class ResponseTimeLoss(nn.Module):
 
         steps = rt_true.max().item()  # maximum number of steps in the batch
 
+        p_halts = p_halts.transpose(0, 1)  # -> (batch_size, steps)
+
         # 1. compute normal distributions
 
         if self.parametric:
-            # TODO 
+            # TODO
             # rt_true_norm = torch.distributions.Normal(rt_true.float().mean(), rt_true.float().std())
             # rt_pred_norm = torch.distributions.Normal(rt_pred.float().mean(), rt_pred.float().std())
             # rt_true_dist = rt_true_norm.log_prob(torch.arange(0, self.max_steps + 1)).exp()
@@ -71,11 +73,22 @@ class ResponseTimeLoss(nn.Module):
         rt_true_dist = rt_true.new_zeros((self.max_steps,), dtype=torch.float)
         rt_true_idx, rt_pred_cnt = torch.unique(rt_true, return_counts=True)
         rt_true_dist[rt_true_idx.long()] += rt_pred_cnt
-        rt_true_dist = F.normalize(rt_true_dist, p=1, dim=0)  # normalize
+        rt_true_dist = rt_true_dist.expand(p_halts.size(0), p_halts.size(1))  # -> (batch_size, steps)
 
-        p_halts = p_halts.transpose(0, 1)  # (batch_size, steps)
+        # cumulative sum on steps
+        p_halts = torch.cumsum(p_halts, dim=1)
+        rt_true_dist = torch.cumsum(rt_true_dist, dim=1)
 
-        rt_true_dist = rt_true_dist.expand(p_halts.size(0), p_halts.size(1))  # (batch_size, steps)
+        # normalize
+        rt_true_dist = rt_true_dist / rt_true_dist.max(dim=1, keepdim=True)[0]
+        p_halts = p_halts / p_halts.max(dim=1, keepdim=True)[0]
+        # rt_true_dist = F.normalize(rt_true_dist, p=1, dim=1)  # normalize
+        # p_halts = F.normalize(p_halts, p=1, dim=1)  # normalize
+
+        if logger is not None and step is not None:
+            # TODO use add_histogram_raw
+            logger.add_histogram('rt_true_dist', rt_true_dist.detach()[0, :], step)
+            logger.add_histogram('p_halts', p_halts.detach()[0, :], step)
 
         # 2. compute the KL divergence between the two normalized distributions
         # loss = torch.distributions.kl_divergence(rt_pred_norm.log(), rt_true_norm)
