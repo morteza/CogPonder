@@ -148,15 +148,17 @@ class CogPonderModel(LightningModule):
         time_loss = self.time_loss_fn(p_halts, rt_true)
         loss = self.resp_loss_beta * resp_loss + self.time_loss_beta * time_loss
 
-        # compute accuracy and log metrics (only in the case of binary classification)
-        if self.task == 'nback':
-            y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
-            self.train_accuracy(y_pred, y_true.int())
-            self.log('train/accuracy', self.train_accuracy, on_epoch=True)
-
+        # log losses
         self.log('train/resp_loss', resp_loss, on_epoch=True)
         self.log('train/time_loss', time_loss, on_epoch=True)
         self.log('train/total_loss', loss, on_epoch=True, logger=True)
+
+        # compute and log accuracy (assuming binary classification)
+        y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
+        accuracy = (y_pred.int() == y_true.int()).float().mean()
+        self.log('train/accuracy', accuracy, on_epoch=True)
+        # self.train_accuracy(y_pred, y_true.int())
+        # self.log('train/accuracy', self.train_accuracy, on_epoch=True)
 
         return loss
 
@@ -188,15 +190,17 @@ class CogPonderModel(LightningModule):
         time_loss = self.time_loss_fn(p_halts, rt_true)
         loss = self.resp_loss_beta * resp_loss + self.time_loss_beta * time_loss
 
-        # compute accuracy and log metrics (only in the case of binary classification)
-        if self.task == 'nback':
-            y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
-            self.train_accuracy(y_pred, y_true.int())
-            self.log('val/accuracy', self.val_accuracy, on_epoch=True)
-
+        # log losses
         self.log('val/resp_loss', resp_loss, on_epoch=True)
         self.log('val/time_loss', time_loss, on_epoch=True)
         self.log('val/total_loss', loss, on_epoch=True, logger=True)
+
+        # compute and log accuracy (assuming binary classification)
+        y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
+        accuracy = (y_pred.int() == y_true.int()).float().mean()
+        self.log('val/accuracy', accuracy, on_epoch=True)
+        # self.val_accuracy(y_pred, y_true.int())
+        # self.log('val/accuracy', self.val_accuracy, on_epoch=True)
 
         return loss
 
