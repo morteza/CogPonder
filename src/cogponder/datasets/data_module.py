@@ -3,6 +3,7 @@ from attr import attr
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader, TensorDataset, random_split, Subset
+from torch.utils.data import Dataset
 
 
 class CogPonderDataModule(pl.LightningDataModule):
@@ -19,8 +20,7 @@ class CogPonderDataModule(pl.LightningDataModule):
         self.save_hyperparameters(ignore=['dataset'], logger=False)
 
         # only the first subject is used
-        # TODO return all the subjects
-        self.dataset = TensorDataset(*dataset)
+        self.dataset = TensorDataset(*dataset[:])
 
         self.train_ratio = train_ratio
         self.batch_size = batch_size
@@ -53,7 +53,7 @@ class CogPonderDataModule(pl.LightningDataModule):
                              'If you need manual access, call prepare_data() first.')
 
         return self._dataloader(self.train_dataset)
-    
+
     def val_dataloader(self):
         if not hasattr(self, 'test_dataset'):
             raise ValueError('Dataset is not loaded yet. It will be loaded automatically. '

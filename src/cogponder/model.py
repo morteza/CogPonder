@@ -55,17 +55,26 @@ class CogPonderModel(LightningModule):
 
         self.recurrent_node = nn.GRUCell(self.inputs_dim, self.embeddings_dim)
 
-        self.embedding = nn.Embedding(self.n_subjects, self.embeddings_dim, device=self.device)
+        self.subject_embedding = nn.Embedding(self.n_subjects,
+                                              self.embeddings_dim,
+                                              device=self.device)
 
     def forward(self, x):
 
+        """_summary_
+
+        Args:
+            X (torch.Tensor): input data of shape (batch_size, n_subjects, inputs_dim)
+        Returns
+        -------
+        _type_
+            _description_
+        """
+
         batch_size = x.size(0)
+        subject_idx = torch.zeros(batch_size, ).long()  # debug x[:, 0].long()
 
-        # subject_idx = x[:, 0].long()
-        # DEBUG (single subject)
-        subject_idx = torch.zeros(batch_size).long()
-
-        h = self.embedding(subject_idx)
+        h = self.subject_embedding(subject_idx)
         p_continue = torch.ones(batch_size, device=self.device)
         halt_steps = torch.zeros(batch_size, dtype=torch.long, device=self.device)
 
@@ -140,7 +149,7 @@ class CogPonderModel(LightningModule):
         loss = self.resp_loss_beta * resp_loss + self.time_loss_beta * time_loss
 
         # compute accuracy and log metrics (only in the case of binary classification)
-        if torch.unique(y_true).shape[0] == 2:
+        if self.task == 'nback':
             y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
             self.train_accuracy(y_pred, y_true.int())
             self.log('train/accuracy', self.train_accuracy, on_epoch=True)
@@ -162,7 +171,7 @@ class CogPonderModel(LightningModule):
                 X, trial_types, is_corrects, responses, rt_true = batch
                 # remove invalid trials (no response)
                 valid_response_mask = (responses != -1)
-                X = X[valid_response_mask]
+                X = X[valid_response_mask, :]
                 trial_types = trial_types[valid_response_mask]
                 responses = responses[valid_response_mask]
                 rt_true = rt_true[valid_response_mask]
@@ -180,7 +189,7 @@ class CogPonderModel(LightningModule):
         loss = self.resp_loss_beta * resp_loss + self.time_loss_beta * time_loss
 
         # compute accuracy and log metrics (only in the case of binary classification)
-        if torch.unique(y_true).shape[0] == 2:
+        if self.task == 'nback':
             y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
             self.train_accuracy(y_pred, y_true.int())
             self.log('val/accuracy', self.val_accuracy, on_epoch=True)

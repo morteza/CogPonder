@@ -105,6 +105,8 @@ class StroopSRODataset(Dataset):
         data['key_press'] = data['key_press'].cat.reorder_categories(colors_order)
         data['stim_color'] = data['stim_color'].cat.reorder_categories(colors_order)
         data['stim_word'] = data['stim_word'].cat.reorder_categories(colors_order)
+
+        # making sure "incongruent" casts to 0 and "congruent" casts to 1
         data['condition'] = data['condition'].cat.reorder_categories(['incongruent', 'congruent'])
 
         data = data.sort_index(ascending=True)
@@ -119,9 +121,8 @@ class StroopSRODataset(Dataset):
 
         X = torch.cat((worker_ids, stim_color, stim_word), dim=1).float()
 
-        X = X.reshape(n_selected_subjects, -1, 3)  # (n_subjects, n_trials, 2)
+        X = X.reshape(n_selected_subjects, -1, 3)  # (n_subjects, n_trials, 3)
 
-        # TODO make sure "incongruent" casts to 0 and "congruent" casts to 1
         trial_types = torch.tensor(data['condition'].cat.codes.values)
         trial_types = trial_types.reshape(n_selected_subjects, -1).float()  # (n_subjects, n_trials)
 
