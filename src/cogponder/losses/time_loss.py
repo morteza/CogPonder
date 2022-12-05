@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 class ResponseTimeLoss(nn.Module):
@@ -14,7 +16,6 @@ class ResponseTimeLoss(nn.Module):
 
         self.max_steps = max_steps
         self.parametric = parametric
-        self.kl_div = nn.KLDivLoss(reduction='batchmean', log_target=True)
 
     def forward(self, p_halts, rt_true, trial_types=None, logger=None, step=None):
         """Compute reg_loss.
@@ -44,6 +45,13 @@ class ResponseTimeLoss(nn.Module):
             total_loss = self.rt_dist_loss(p_halts, rt_true, logger=logger, step=step)
 
         return total_loss
+
+    def log_distribution(self, logger, label, p, step):
+        if logger is None or step is None:
+            return
+
+        sns.lineplot(x=range(p.cpu().size(0)), y=p.cpu().numpy())
+        logger.add_figure(tag=label, figure=plt.gcf(), global_step=step)
 
     def rt_dist_loss(self, p_halts, rt_true, logger=None, step=None):
         """Compute the KL divergence between the predicted and true distributions.
@@ -76,22 +84,20 @@ class ResponseTimeLoss(nn.Module):
         rt_true_dist = rt_true_dist.expand(p_halts.size(0), p_halts.size(1))  # -> (batch_size, steps)
 
         # cumulative sum on steps
-        p_halts = torch.cumsum(p_halts, dim=1)
-        rt_true_dist = torch.cumsum(rt_true_dist, dim=1)
+        p_halts = torch.cumsum(p_halts, dim=1).flip(1)
+        rt_true_dist = torch.cumsum(rt_true_dist, dim=1).flip(1)
 
         # normalize
-        rt_true_dist = rt_true_dist / rt_true_dist.max(dim=1, keepdim=True)[0]
-        p_halts = p_halts / p_halts.max(dim=1, keepdim=True)[0]
-        # rt_true_dist = F.normalize(rt_true_dist, p=1, dim=1)  # normalize
-        # p_halts = F.normalize(p_halts, p=1, dim=1)  # normalize
+        # rt_true_dist = rt_true_dist / rt_true_dist.max(dim=1, keepdim=True)[0]
+        # p_halts = p_halts / p_halts.max(dim=1, keepdim=True)[0]
+        rt_true_dist = F.normalize(rt_true_dist, p=1, dim=1)  # normalize
+        p_halts = F.normalize(p_halts, p=1, dim=1)  # normalize
 
-        if logger is not None and step is not None:
-            # TODO use add_histogram_raw
-            logger.add_histogram('rt_true_dist', rt_true_dist.detach()[0, :], step)
-            logger.add_histogram('p_halts', p_halts.detach()[0, :], step)
+        # log distributions
+        self.log_distribution(logger, 'rt_true_dist', rt_true_dist.detach().mean(dim=0), step)
+        self.log_distribution(logger, 'p_halts', p_halts.detach().mean(dim=0), step)
 
         # 2. compute the KL divergence between the two normalized distributions
-        # loss = torch.distributions.kl_divergence(rt_pred_norm.log(), rt_true_norm)
-        loss = self.kl_div(p_halts, rt_true_dist)
+        loss = F.kl_div(p_halts.log(), rt_true_dist, reduction='batchmean', log_target=False)
 
         return loss

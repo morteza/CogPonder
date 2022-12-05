@@ -13,7 +13,7 @@ class StroopSRODataset(Dataset):
         self,
         n_subjects=-1,
         response_step_interval=10,
-        non_decision_time=200,  # in millis
+        non_decision_time='auto',  # int (in millis) or 'auto'
         data_file='data/Self_Regulation_Ontology/stroop.csv.gz'
     ):
 
@@ -23,17 +23,20 @@ class StroopSRODataset(Dataset):
             n_subjects (int): Number of subjects. Defaults to -1 (all).
             response_step_interval (int):
                 Size of the bins for the conversion of the response time to steps; in millis.
-            non_decision_time (int):
-                in millis, is considered to be the time between making decision and
-                observing corresponding effects (e.g., after some motor movements).
+            non_decision_time (int or 'auto'):
+                If int, in millis, it it will be subtracted from the response time.
+                If 'auto', it will be estimated as the minimum of response times per subject,
+                mapping values to 1..(max-min+1).
+                If None, no subtraction will be performed.
         """
 
         self.n_subjects = n_subjects
         self.response_step_interval = response_step_interval
+        self.non_decision_time = non_decision_time
         self.data_file = data_file
 
         # load and cleanup the data
-        data = self.prepare_data(self.n_subjects, self.response_step_interval, self.data_file)
+        data = self.prepare_data()
         self.X, self.trial_types, self.is_corrects, self.responses, self.response_steps = data
 
     def __len__(self):
@@ -51,14 +54,9 @@ class StroopSRODataset(Dataset):
                 self.responses[idx],
                 self.response_steps[idx, :])
 
-    @classmethod
-    def prepare_data(cls,
-                     n_subjects,
-                     response_step_interval,
-                     data_file,
+    def prepare_data(self,
                      colors_order=['red', 'green', 'blue'],
-                     color_codes={66: 'blue', 71: 'green', 82: 'red'}
-                     ):
+                     color_codes={66: 'blue', 71: 'green', 82: 'red'}):
         """[summary]
         Args:
             response_step_interval (int):
@@ -83,7 +81,7 @@ class StroopSRODataset(Dataset):
 
         # TODO support multi subject by querying worker_id
         data = pd.read_csv(
-            data_file,
+            self.data_file,
             index_col=0,
             dtype={
                 'worker_id': 'str',
@@ -91,7 +89,7 @@ class StroopSRODataset(Dataset):
                 'stim_word': 'category',
                 'condition': 'category'})
 
-        selected_worker_ids = data['worker_id'].unique()[:n_subjects]  # noqa: F841
+        selected_worker_ids = data['worker_id'].unique()[:self.n_subjects]  # noqa: F841
         n_selected_subjects = len(selected_worker_ids)
 
         # filter out practice and no-response trials
@@ -135,7 +133,16 @@ class StroopSRODataset(Dataset):
         # convert RTs to steps
         response_times = torch.tensor(data['rt'].values)
         response_times = response_times.reshape(n_selected_subjects, -1)  # (n_subjects, n_trials)
-        response_steps = torch.round(response_times / response_step_interval).int()
+
+        response_steps = torch.round(response_times / self.response_step_interval).int()
+
+        if type(self.non_decision_time) == int:
+            pass
+
+        if self.non_decision_time == 'auto':
+            _valid_rs = torch.where(response_steps <= 0, torch.inf, response_steps)
+            rs_min = torch.min(_valid_rs, dim=1, keepdim=True)[0]
+            response_steps = response_steps - rs_min + 1
 
         return (
             X,

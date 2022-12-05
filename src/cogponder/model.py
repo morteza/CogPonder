@@ -73,7 +73,7 @@ class CogPonderModel(LightningModule):
         """
 
         batch_size = x.size(0)
-        subject_idx = torch.zeros(batch_size, ).long()  # debug x[:, 0].long()
+        subject_idx = torch.zeros(batch_size, ).to(self.device).long()  # debug x[:, 0].long()
 
         h = self.subject_embedding(subject_idx)
         p_continue = torch.ones(batch_size, device=self.device)
@@ -146,13 +146,13 @@ class CogPonderModel(LightningModule):
 
         # compute losses
         resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true)
-        time_loss = self.time_loss_fn(p_halts, rt_true) #, logger=self.logger.experiment, step=self.global_step)
+        time_loss = self.time_loss_fn(p_halts, rt_true, logger=self.logger.experiment, step=self.global_step)
         loss = self.resp_loss_beta * resp_loss + self.time_loss_beta * time_loss
 
         # log losses
-        self.log('train/resp_loss', resp_loss, on_epoch=True)
-        self.log('train/time_loss', time_loss, on_epoch=True)
-        self.log('train/total_loss', loss, on_epoch=True, logger=True)
+        self.log('train/resp_loss', resp_loss, on_epoch=True, on_step=False)
+        self.log('train/time_loss', time_loss, on_epoch=True, on_step=False)
+        self.log('train/total_loss', loss, on_epoch=True, logger=True, on_step=False)
 
         # compute and log accuracy (assuming binary classification)
         # y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
@@ -192,9 +192,9 @@ class CogPonderModel(LightningModule):
         loss = self.resp_loss_beta * resp_loss + self.time_loss_beta * time_loss
 
         # log losses
-        self.log('val/resp_loss', resp_loss, on_epoch=True)
-        self.log('val/time_loss', time_loss, on_epoch=True)
-        self.log('val/total_loss', loss, on_epoch=True, logger=True)
+        self.log('val/resp_loss', resp_loss, on_epoch=True, on_step=False)
+        self.log('val/time_loss', time_loss, on_epoch=True, on_step=False)
+        self.log('val/total_loss', loss, on_epoch=True, logger=True, on_step=False)
 
         # compute and log accuracy (assuming binary classification)
         # y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
