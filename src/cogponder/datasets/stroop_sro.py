@@ -134,15 +134,18 @@ class StroopSRODataset(Dataset):
         response_times = torch.tensor(data['rt'].values)
         response_times = response_times.reshape(n_selected_subjects, -1)  # (n_subjects, n_trials)
 
-        response_steps = torch.round(response_times / self.response_step_interval).int()
-
-        if type(self.non_decision_time) == int:
-            pass
-
+        # automatically calculate non-decision time (min RT - 1-step)
         if self.non_decision_time == 'auto':
-            _valid_rs = torch.where(response_steps <= 0, torch.inf, response_steps)
-            rs_min = torch.min(_valid_rs, dim=1, keepdim=True)[0]
-            response_steps = response_steps - rs_min + 1
+            valid_rts = torch.where(response_times <= 0, torch.inf, response_times)
+            min_rt = torch.min(valid_rts, dim=1, keepdim=True)[0]
+            self.non_decision_time = min_rt - self.response_step_interval
+
+        # subtract non decision time
+        response_times = torch.where(response_times <= 0,
+                                     0, response_times - self.non_decision_time)
+
+        # convert to steps
+        response_steps = torch.round(response_times / self.response_step_interval).int()
 
         return (
             X,

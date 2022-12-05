@@ -185,6 +185,7 @@ class CogPonderModel(LightningModule):
 
         # forward pass
         y_steps, p_halts, rt_pred = self.forward(X)
+        y_pred = torch.argmax(y_steps, dim=-1).gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
 
         # compute losses
         resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true)
@@ -195,6 +196,23 @@ class CogPonderModel(LightningModule):
         self.log('val/resp_loss', resp_loss, on_epoch=True, on_step=False)
         self.log('val/time_loss', time_loss, on_epoch=True, on_step=False)
         self.log('val/total_loss', loss, on_epoch=True, logger=True, on_step=False)
+
+        match self.task:
+            case 'nback':
+                pass
+            case 'stroop':
+
+                is_corrects_pred = (y_pred.long() == y_true).float()
+                cong_is_corrects = torch.where(trial_types == 1, is_corrects_pred, torch.nan)
+                incong_is_corrects = torch.where(trial_types == 0, is_corrects_pred, torch.nan)
+
+                accuracy = torch.nanmean(is_corrects_pred)
+                cong_accuracy = torch.nanmean(cong_is_corrects)
+                incong_accuracy = torch.nanmean(incong_is_corrects)
+
+                self.log('val/accuracy', accuracy, on_epoch=True)
+                self.log('val/accuracy_congruent', cong_accuracy, on_epoch=True)
+                self.log('val/accuracy_incongruent', incong_accuracy, on_epoch=True)
 
         # compute and log accuracy (assuming binary classification)
         # y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
