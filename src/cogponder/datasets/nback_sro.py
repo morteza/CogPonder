@@ -3,7 +3,6 @@ import pandas as pd
 from torch.utils.data import Dataset
 from pathlib import Path
 
-
 class NBackSRODataset(Dataset):
     """Self-regulation ontology adaptive N-back dataset -- a binary classification task.
 
@@ -32,7 +31,7 @@ class NBackSRODataset(Dataset):
 
         # load and cleanup the data
         self.X, self.trial_types, self.is_targets, self.responses, self.response_times = \
-            self.prepare_data(worker_id='s521')
+            self.prepare_data(worker_id='s521', n_back=self.n_back)
 
     def __len__(self):
         """Get the number of samples.
@@ -49,7 +48,7 @@ class NBackSRODataset(Dataset):
                 self.responses[idx],
                 self.response_times[idx, :])
 
-    def prepare_data(self, worker_id):
+    def prepare_data(self, worker_id, n_back):
         """[summary]
         # TODO required data columns:
         #   subject_index, trial_index, stimulus_index, accuracy, response_time
@@ -80,34 +79,39 @@ class NBackSRODataset(Dataset):
                 'stim_word': 'category',
                 'condition': 'category'})
 
+        d = data.query('rt == 849.0 and worker_id == "s521"').T
+
         # filter out practice and no-response trials
         data = data.query('worker_id==@worker_id and '
                           'exp_stage == "adaptive" and '
-                          'load == @self.n_back').copy()
+                          # 'block_num == 0.0 and '
+                          'load == @n_back').copy()
+
         data = data.sort_values(['block_num', 'trial_num'])
 
         data['worker_id'] = data['worker_id'].astype('category')
 
-        stimuli = data.stim.str.upper().astype('category').cat.codes.values
+        stimuli = data['stim'].str.upper().astype('category').cat.codes.values
 
         X = torch.tensor(stimuli).reshape(1, -1)
+        X = X.unfold(1, n_back + 1, 1)  # sliding window of size n_back
+        X = torch.cat([torch.zeros(X.shape[0], 2, X.shape[2]), X], dim=1)
+
+        # add subject_index as the first column of X
+        X_ids = torch.tensor(data['worker_id'].cat.codes.values).reshape(1, -1)
+
+        X = torch.cat([X_ids.unsqueeze(-1), X], dim=2)
+
+        is_targets = (data['stim'].str.lower() == data['target'].str.lower()).values
+
+        trial_types = torch.tensor(is_targets).reshape(1, -1).int()
 
         # response (either matched or not-matched)
         responses = torch.tensor(data.key_press.astype('category').cat.codes.values)
-        responses = responses.reshape(1, -1).float()
+        responses = responses.reshape(1, -1)
 
-        X = X.unfold(1, self.n_back + 1, 1)  # sliding window of size n_back
-
-        is_targets = []
-        for subj_x in X:
-            subj_targets = torch.stack(
-                [x[-1] == x[-1 - self.n_back] for x in subj_x.unbind(dim=0)]
-            )
-            is_targets.append(subj_targets)
-        is_targets = torch.stack(is_targets)
-
-        # TODO trial types
-        trial_types = torch.bitwise_or(is_targets * 2, responses[:, self.n_back:].long()).int() + 1
+        # is_corrects
+        is_corrects = torch.tensor(data['correct'].values).reshape(1, -1).bool()
 
         # response time
         # convert RTs to steps
@@ -127,10 +131,12 @@ class NBackSRODataset(Dataset):
         # convert to steps
         response_steps = torch.round(response_times / self.response_step_interval).int()
 
+        valid_trials_mask = ~data['target'].isna()
+
         return (
-            X.float(),
-            trial_types,
-            is_targets,
-            responses[:, self.n_back:],
-            response_steps[:, self.n_back:]
+            X[:, valid_trials_mask, :],
+            trial_types[:, valid_trials_mask],
+            is_corrects[:, valid_trials_mask],
+            responses[:, valid_trials_mask],
+            response_steps[:, valid_trials_mask]
         )

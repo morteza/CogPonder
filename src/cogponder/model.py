@@ -122,22 +122,24 @@ class CogPonderModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        # unpack task-specific batch
+        X, trial_types, is_corrects, responses, rt_true = batch
+        y_true = responses.long()
+
+        # task-specific cleanups
         match self.task:
             case 'nback':
-                X, trial_types, _, responses, rt_true = batch
-                y_true = responses.long()
+                valid_response_mask = (rt_true > 0) & (responses != 0)
+                X = X[valid_response_mask, ...]
+                trial_types = trial_types[valid_response_mask]
+                y_true = y_true[valid_response_mask]
+                rt_true = rt_true[valid_response_mask]
             case 'stroop':
-                X, trial_types, _, responses, rt_true = batch
-
                 # remove invalid trials (no response)
                 valid_response_mask = (responses != -1)
-                X = X[valid_response_mask]
+                X = X[valid_response_mask, :]
                 trial_types = trial_types[valid_response_mask]
-                responses = responses[valid_response_mask]
+                y_true = y_true[valid_response_mask]
                 rt_true = rt_true[valid_response_mask]
-
-                y_true = responses.long()
             case _:
                 raise Exception(f'Invalid cognitive task: {self.task}')
 
@@ -165,21 +167,24 @@ class CogPonderModel(LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        # unpack task-specific batch
+        X, trial_types, is_corrects, responses, rt_true = batch
+        y_true = responses.long()
+
+        # task-specific cleanups
         match self.task:
             case 'nback':
-                X, trial_types, is_targets, responses, rt_true = batch
-                y_true = responses.long()
+                valid_response_mask = (rt_true > 0) & (responses != 0)
+                X = X[valid_response_mask, ...]
+                trial_types = trial_types[valid_response_mask]
+                y_true = y_true[valid_response_mask]
+                rt_true = rt_true[valid_response_mask]
             case 'stroop':
-                X, trial_types, is_corrects, responses, rt_true = batch
                 # remove invalid trials (no response)
                 valid_response_mask = (responses != -1)
                 X = X[valid_response_mask, :]
                 trial_types = trial_types[valid_response_mask]
-                responses = responses[valid_response_mask]
+                y_true = y_true[valid_response_mask]
                 rt_true = rt_true[valid_response_mask]
-
-                y_true = responses.long()
             case _:
                 raise Exception(f'Invalid cognitive task: {self.task}')
 
@@ -199,9 +204,14 @@ class CogPonderModel(LightningModule):
 
         match self.task:
             case 'nback':
+                # compute and log accuracy (assuming binary classification)
+                # y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
+                # accuracy = (y_pred.int() == y_true.int()).float().mean()
+                # self.log('val/accuracy', accuracy, on_epoch=True)
+                # self.val_accuracy(y_pred, y_true.int())
+                # self.log('val/accuracy', self.val_accuracy, on_epoch=True)
                 pass
             case 'stroop':
-
                 is_corrects_pred = (y_pred.long() == y_true).float()
                 cong_is_corrects = torch.where(trial_types == 1, is_corrects_pred, torch.nan)
                 incong_is_corrects = torch.where(trial_types == 0, is_corrects_pred, torch.nan)
@@ -213,13 +223,6 @@ class CogPonderModel(LightningModule):
                 self.log('val/accuracy', accuracy, on_epoch=True)
                 self.log('val/accuracy_congruent', cong_accuracy, on_epoch=True)
                 self.log('val/accuracy_incongruent', incong_accuracy, on_epoch=True)
-
-        # compute and log accuracy (assuming binary classification)
-        # y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
-        # accuracy = (y_pred.int() == y_true.int()).float().mean()
-        # self.log('val/accuracy', accuracy, on_epoch=True)
-        # self.val_accuracy(y_pred, y_true.int())
-        # self.log('val/accuracy', self.val_accuracy, on_epoch=True)
 
         return loss
 
