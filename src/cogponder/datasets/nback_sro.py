@@ -79,7 +79,6 @@ class NBackSRODataset(Dataset):
                 'stim_word': 'category',
                 'condition': 'category'})
 
-        d = data.query('rt == 849.0 and worker_id == "s521"').T
 
         # filter out practice and no-response trials
         data = data.query('worker_id==@worker_id and '
