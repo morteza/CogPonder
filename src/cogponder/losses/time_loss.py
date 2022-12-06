@@ -50,7 +50,7 @@ class ResponseTimeLoss(nn.Module):
         if logger is None or step is None:
             return
 
-        sns.lineplot(x=range(p.cpu().size(0)), y=p.cpu().numpy())
+        sns.lineplot(x=range(p.cpu().size(0)), y=p.cpu().numpy(), lw=4)
         logger.add_figure(tag=label, figure=plt.gcf(), global_step=step)
 
     def rt_dist_loss(self, p_halts, rt_true, logger=None, step=None):
