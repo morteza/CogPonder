@@ -34,8 +34,8 @@ class CogPonderModel(LightningModule):
 
         self.example_input_array = example_input_array
 
-        self.train_accuracy = torchmetrics.Accuracy()
-        self.val_accuracy = torchmetrics.Accuracy()
+        # self.train_accuracy = torchmetrics.Accuracy(task='multiclass')
+        # self.val_accuracy = torchmetrics.Accuracy(task='multiclass')
 
         self.resp_loss_fn = ResponseLoss()
         self.time_loss_fn = ResponseTimeLoss(self.max_response_step)
