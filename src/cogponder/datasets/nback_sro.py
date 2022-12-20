@@ -2,6 +2,8 @@ import torch
 import pandas as pd
 from torch.utils.data import Dataset
 from pathlib import Path
+from typing import Union
+
 
 class NBackSRODataset(Dataset):
     """Self-regulation ontology adaptive N-back dataset -- a binary classification task.
@@ -13,7 +15,7 @@ class NBackSRODataset(Dataset):
         n_subjects,
         n_back=2,
         response_step_interval=10,
-        non_decision_time='auto',
+        non_decision_time: Union[str, int] = 'auto',
         data_file='data/Self_Regulation_Ontology/adaptive_n_back.csv.gz'
     ):
 
@@ -21,7 +23,8 @@ class NBackSRODataset(Dataset):
 
         Args:
             n_subjects (int): Number of subjects.
-            n_back (int): Number of items in the N-back sequence. Default: 2.
+            n_back (int): Number of items in the N-back sequence. Defaults to 2.
+            non_decision_time (str or int): Non-decision time in milliseconds. Defaults to 'auto'.
         """
         self.n_subjects = n_subjects
         self.n_back = n_back
@@ -78,7 +81,6 @@ class NBackSRODataset(Dataset):
                 'stim_color': 'category',
                 'stim_word': 'category',
                 'condition': 'category'})
-
 
         # filter out practice and no-response trials
         data = data.query('worker_id==@worker_id and '
