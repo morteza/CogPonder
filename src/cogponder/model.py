@@ -2,10 +2,9 @@
 
 import torch
 from torch import nn
-import torch.nn.functional as F
 from pytorch_lightning import LightningModule
 from .losses import ResponseLoss, ResponseTimeLoss
-import torchmetrics
+# import torchmetrics
 
 
 class CogPonderModel(LightningModule):
@@ -29,7 +28,7 @@ class CogPonderModel(LightningModule):
         self.loss_by_trial_type = config['loss_by_trial_type']
         self.learning_rate = config['learning_rate']
         self.max_response_step = config['max_response_step']
-        self.n_subjects = config['n_subjects']
+        self.n_contexts = config['n_contexts']
         self.task = config['task']
 
         self.example_input_array = example_input_array
@@ -56,26 +55,28 @@ class CogPonderModel(LightningModule):
 
         self.recurrent_node = nn.GRUCell(self.inputs_dim, self.embeddings_dim)
 
-        self.subject_embedding = nn.Embedding(self.n_subjects,
-                                              self.embeddings_dim,
-                                              device=self.device)
+        self.embeddings = nn.Embedding(
+            self.n_contexts,
+            self.embeddings_dim,
+            device=self.device)
 
-    def forward(self, x):
+    def forward(self, context, x):
 
         """_summary_
 
-        Args:
-            X (torch.Tensor): input data of shape (batch_size, n_subjects, inputs_dim)
+        Args
+        ----
+            context (torch.Tensor): contextual information of shape (batch_size,)
+            x (torch.Tensor): input data of shape (batch_size, n_contexts, inputs_dim)
+
         Returns
         -------
-        _type_
-            _description_
+            (y_steps, p_steps, halt_steps)
         """
 
         batch_size = x.size(0)
-        subject_idx = torch.zeros(batch_size, ).to(self.device).long()  # debug x[:, 0].long()
 
-        h = self.subject_embedding(subject_idx)
+        h = self.embeddings(context)
         p_continue = torch.ones(batch_size, device=self.device)
         halt_steps = torch.zeros(batch_size, dtype=torch.long, device=self.device)
 
@@ -90,7 +91,7 @@ class CogPonderModel(LightningModule):
                 lambda_n = self.halt_node(h)[:, 0]
 
             y_step = self.output_node(h)
-            h = self.recurrent_node(x[:, 1:], h)  # x[:, 1:] would skip subject index
+            h = self.recurrent_node(x, h)
 
             y_list.append(y_step)
             p_list.append(p_continue * lambda_n)
@@ -102,7 +103,7 @@ class CogPonderModel(LightningModule):
                 ((halt_steps == 0) * n * torch.bernoulli(lambda_n)).to(torch.long)
             )
 
-            # IGNORE: for debugging
+            # IGNORE: enable for debugging or stopping the recurrent loop upon halt.
             if False & (halt_steps > 0).sum() == batch_size:
                 break
 
@@ -116,19 +117,24 @@ class CogPonderModel(LightningModule):
             p_steps[halt_step:, i] = 0.0
             p_steps[halt_step, i] = 1 - p_steps[:halt_step, i].sum()
 
-        # y = torch.functional.F.sigmoid(y_steps)
-
         return y_steps, p_steps, halt_steps
 
     def training_step(self, batch, batch_idx):
 
+        # FIXME collapse subjects. this should be handled by datamodule
+        # batch = [d.reshape(-1, *d.shape[2:]) for d in batch]
         X, trial_types, is_corrects, responses, rt_true = batch
+
+        # TODO context must be provided separately by the data module (e.g, subject_id)
+        _, context = torch.unique(X[:, 0].long(), return_inverse=True)  # subject_index
+        X = X[:, 1:]  # remove subject index
         y_true = responses.long()
 
         # task-specific cleanups
         match self.task:
             case 'nback':
                 valid_response_mask = (rt_true > 0) & (responses != 0)
+                context = context[valid_response_mask, ...]
                 X = X[valid_response_mask, ...]
                 trial_types = trial_types[valid_response_mask]
                 y_true = y_true[valid_response_mask]
@@ -136,6 +142,7 @@ class CogPonderModel(LightningModule):
             case 'stroop':
                 # remove invalid trials (no response)
                 valid_response_mask = (responses != -1)
+                context = context[valid_response_mask, ...]
                 X = X[valid_response_mask, :]
                 trial_types = trial_types[valid_response_mask]
                 y_true = y_true[valid_response_mask]
@@ -144,7 +151,7 @@ class CogPonderModel(LightningModule):
                 raise Exception(f'Invalid cognitive task: {self.task}')
 
         # forward pass
-        y_steps, p_halts, rt_pred = self.forward(X)
+        y_steps, p_halts, rt_pred = self.forward(context, X)
 
         # compute losses
         resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true)
@@ -167,13 +174,20 @@ class CogPonderModel(LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
+        # FIXME collapse subjects. this should be handled by datamodule
+        # batch = [d.reshape(-1, *d.shape[2:]) for d in batch]
         X, trial_types, is_corrects, responses, rt_true = batch
+
+        # TODO context must be provided separately by the data module (e.g, subject_id)
+        _, context = torch.unique(X[:, 0].long(), return_inverse=True)  # subject_index
+        X = X[:, 1:]  # remove subject index
         y_true = responses.long()
 
         # task-specific cleanups
         match self.task:
             case 'nback':
                 valid_response_mask = (rt_true > 0) & (responses != 0)
+                context = context[valid_response_mask, ...]
                 X = X[valid_response_mask, ...]
                 trial_types = trial_types[valid_response_mask]
                 y_true = y_true[valid_response_mask]
@@ -181,6 +195,7 @@ class CogPonderModel(LightningModule):
             case 'stroop':
                 # remove invalid trials (no response)
                 valid_response_mask = (responses != -1)
+                context = context[valid_response_mask, ...]
                 X = X[valid_response_mask, :]
                 trial_types = trial_types[valid_response_mask]
                 y_true = y_true[valid_response_mask]
@@ -189,7 +204,7 @@ class CogPonderModel(LightningModule):
                 raise Exception(f'Invalid cognitive task: {self.task}')
 
         # forward pass
-        y_steps, p_halts, rt_pred = self.forward(X)
+        y_steps, p_halts, rt_pred = self.forward(context, X)
         y_pred = torch.argmax(y_steps, dim=-1).gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
 
         # compute losses
