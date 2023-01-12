@@ -121,20 +121,14 @@ class CogPonderModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        # FIXME collapse subjects. this should be handled by datamodule
-        # batch = [d.reshape(-1, *d.shape[2:]) for d in batch]
-        X, trial_types, is_corrects, responses, rt_true = batch
-
-        # TODO context must be provided separately by the data module (e.g, subject_id)
-        _, context = torch.unique(X[:, 0].long(), return_inverse=True)  # subject_index
-        X = X[:, 1:]  # remove subject index
+        contexts, X, trial_types, is_corrects, responses, rt_true = batch
         y_true = responses.long()
 
         # task-specific cleanups
         match self.task:
             case 'nback':
                 valid_response_mask = (rt_true > 0) & (responses != 0)
-                context = context[valid_response_mask, ...]
+                contexts = contexts[valid_response_mask, ...]
                 X = X[valid_response_mask, ...]
                 trial_types = trial_types[valid_response_mask]
                 y_true = y_true[valid_response_mask]
@@ -142,7 +136,7 @@ class CogPonderModel(LightningModule):
             case 'stroop':
                 # remove invalid trials (no response)
                 valid_response_mask = (responses != -1)
-                context = context[valid_response_mask, ...]
+                contexts = contexts[valid_response_mask, ...]
                 X = X[valid_response_mask, :]
                 trial_types = trial_types[valid_response_mask]
                 y_true = y_true[valid_response_mask]
@@ -151,8 +145,9 @@ class CogPonderModel(LightningModule):
                 raise Exception(f'Invalid cognitive task: {self.task}')
 
         # forward pass
-        y_steps, p_halts, rt_pred = self.forward(context, X)
-
+        y_steps, p_halts, rt_pred = self.forward(contexts, X)
+        
+        print(y_steps.shape, p_halts.shape, rt_pred.shape)
         # compute losses
         resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true)
         time_loss = self.time_loss_fn(p_halts, rt_true, logger=self.logger.experiment, step=self.global_step)
@@ -174,20 +169,15 @@ class CogPonderModel(LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        # FIXME collapse subjects. this should be handled by datamodule
-        # batch = [d.reshape(-1, *d.shape[2:]) for d in batch]
-        X, trial_types, is_corrects, responses, rt_true = batch
-
-        # TODO context must be provided separately by the data module (e.g, subject_id)
-        _, context = torch.unique(X[:, 0].long(), return_inverse=True)  # subject_index
-        X = X[:, 1:]  # remove subject index
+        contexts, X, trial_types, is_corrects, responses, rt_true = batch
+        print('val contexts', torch.unique(contexts))
         y_true = responses.long()
 
         # task-specific cleanups
         match self.task:
             case 'nback':
                 valid_response_mask = (rt_true > 0) & (responses != 0)
-                context = context[valid_response_mask, ...]
+                contexts = contexts[valid_response_mask, ...]
                 X = X[valid_response_mask, ...]
                 trial_types = trial_types[valid_response_mask]
                 y_true = y_true[valid_response_mask]
@@ -195,7 +185,7 @@ class CogPonderModel(LightningModule):
             case 'stroop':
                 # remove invalid trials (no response)
                 valid_response_mask = (responses != -1)
-                context = context[valid_response_mask, ...]
+                contexts = contexts[valid_response_mask, ...]
                 X = X[valid_response_mask, :]
                 trial_types = trial_types[valid_response_mask]
                 y_true = y_true[valid_response_mask]
@@ -204,8 +194,10 @@ class CogPonderModel(LightningModule):
                 raise Exception(f'Invalid cognitive task: {self.task}')
 
         # forward pass
-        y_steps, p_halts, rt_pred = self.forward(context, X)
+        y_steps, p_halts, rt_pred = self.forward(contexts, X)
         y_pred = torch.argmax(y_steps, dim=-1).gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
+
+        print(y_steps.shape, p_halts.shape, rt_pred.shape)
 
         # compute losses
         resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true)

@@ -11,7 +11,7 @@ class StroopSRODataset(Dataset):
 
     def __init__(
         self,
-        n_subjects=-1,
+        subject_ids: list[int] = [],  # [] for all
         response_step_interval=10,
         non_decision_time='auto',  # int (in millis) or 'auto'
         data_file='data/Self_Regulation_Ontology/stroop.csv.gz'
@@ -20,7 +20,7 @@ class StroopSRODataset(Dataset):
         """Initialize and load the SRO Stroop dataset.
 
         Args:
-            n_subjects (int): Number of subjects. Defaults to -1 (all).
+            subject_ids (list): Subject identifiers to fetch. Defaults to [] (all).
             response_step_interval (int):
                 Size of the bins for the conversion of the response time to steps; in millis.
             non_decision_time (int or 'auto'):
@@ -30,29 +30,44 @@ class StroopSRODataset(Dataset):
                 If None, no subtraction will be performed.
         """
 
-        self.n_subjects = n_subjects
+        self.subject_ids = subject_ids
         self.response_step_interval = response_step_interval
         self.non_decision_time = non_decision_time
         self.data_file = data_file
 
         # load and cleanup the data
         data = self.prepare_data()
-        self.X, self.trial_types, self.is_corrects, self.responses, self.response_steps = data
+        self.contexts, self.stimuli, self.trial_types, self.is_corrects, self.responses, self.response_steps = data
 
     def __len__(self):
         """Get the number of samples.
         """
-        return self.n_subjects
+        return len(self.subject_ids)
 
     def __getitem__(self, idx):
         """Get a feature vector and it's target label.
         """
 
-        return (self.X[idx],
-                self.trial_types[idx],
-                self.is_corrects[idx],
-                self.responses[idx],
-                self.response_steps[idx, :])
+        if isinstance(idx, slice):
+            idx = torch.unique(self.contexts)[idx]
+
+        masker = torch.isin(self.contexts, idx)
+
+        # squeeze subjects into one array
+        # contexts = contexts.reshape(-1,)
+        # stimuli = stimuli.reshape(-1, stimuli.shape[-1])
+        # trial_types = trial_types.reshape(-1,)
+        # is_corrects = is_corrects.reshape(-1,)
+        # responses = responses.reshape(-1,)
+        # response_steps = response_steps.reshape(-1,)
+
+        return (
+            self.contexts[masker],
+            self.stimuli[masker, :],
+            self.trial_types[masker],
+            self.is_corrects[masker],
+            self.responses[masker],
+            self.response_steps[masker])
 
     def prepare_data(self,
                      colors_order=['red', 'green', 'blue'],
@@ -65,9 +80,12 @@ class StroopSRODataset(Dataset):
                 SRO compressed file containing the data; original file name: stroop.csv.gz.
 
         Returns:
-            X: stimulus features
+            contexts: contextual information for each trial.
+                This can include for example subject, task, and environment.
+                shape: (n_subjects * n_trials)
+            stimuli: stimulus features
                 Stroop stimulus features. dim0 is the ink color (i.e., target) and dim1 is the word.
-                shape: (n_subjects, n_trials, 2).
+                shape: (n_subjects * n_trials, 2).
             trial_types: whether it was a congruent or incongruent trial.
                 To match tensor datatypes, 0=incongruent, 1=congruent.
                 shape: (n_subjects, n_trials)
@@ -89,11 +107,15 @@ class StroopSRODataset(Dataset):
                 'stim_word': 'category',
                 'condition': 'category'})
 
-        selected_worker_ids = data['worker_id'].unique()[:self.n_subjects]  # noqa: F841
-        n_selected_subjects = len(selected_worker_ids)
+        # convert work_id from 'sX' string to numerical X
+        data['worker_id'] = data['worker_id'].apply(lambda w: w.replace('s', '')).astype('int')
+
+        # load all subjects if none specified
+        if len(self.subject_ids) == 0:
+            self.subject_ids = data['worker_id'].unique()
 
         # filter out practice and no-response trials
-        data = data.query('worker_id in @selected_worker_ids and '
+        data = data.query('worker_id in @self.subject_ids and '
                           'exp_stage == "test"').copy()
 
         data['worker_id'] = data['worker_id'].astype('category')
@@ -114,25 +136,25 @@ class StroopSRODataset(Dataset):
         stim_word = data['stim_word'].cat.codes
         stim_word = torch.tensor(stim_word.values).reshape(-1, 1)
 
-        worker_ids = data['worker_id'].cat.codes
-        worker_ids = torch.tensor(worker_ids.values).reshape(-1, 1)
+        contexts = torch.tensor(data['worker_id'].cat.codes.values)
+        contexts = contexts.reshape(len(self.subject_ids), -1).long()  # (n_subjects, n_trials)
 
-        X = torch.cat((worker_ids, stim_color, stim_word), dim=1).float()
+        stimuli = torch.cat((stim_color, stim_word), dim=1).float()
 
-        X = X.reshape(n_selected_subjects, -1, 3)  # (n_subjects, n_trials, 3)
+        stimuli = stimuli.reshape(len(self.subject_ids), -1, 2)  # (n_subjects, n_trials, 2)
 
         trial_types = torch.tensor(data['condition'].cat.codes.values)
-        trial_types = trial_types.reshape(n_selected_subjects, -1).float()  # (n_subjects, n_trials)
+        trial_types = trial_types.reshape(len(self.subject_ids), -1).float()  # (n_subjects, n_trials)
 
         is_corrects = torch.tensor(data['correct'].values)
-        is_corrects = is_corrects.reshape(n_selected_subjects, -1).float()  # (n_subjects, n_trials)
+        is_corrects = is_corrects.reshape(len(self.subject_ids), -1).float()  # (n_subjects, n_trials)
 
         responses = torch.tensor(data['key_press'].cat.codes.values)
-        responses = responses.reshape(n_selected_subjects, -1)  # (n_subjects, n_trials)
+        responses = responses.reshape(len(self.subject_ids), -1)  # (n_subjects, n_trials)
 
         # convert RTs to steps
         response_times = torch.tensor(data['rt'].values)
-        response_times = response_times.reshape(n_selected_subjects, -1)  # (n_subjects, n_trials)
+        response_times = response_times.reshape(len(self.subject_ids), -1)  # (n_subjects, n_trials)
 
         # automatically calculate non-decision time (min RT - 1-step)
         if self.non_decision_time == 'auto':
@@ -148,7 +170,8 @@ class StroopSRODataset(Dataset):
         response_steps = torch.round(response_times / self.response_step_interval).int()
 
         return (
-            X,
+            contexts,
+            stimuli,
             trial_types,
             is_corrects,
             responses,
