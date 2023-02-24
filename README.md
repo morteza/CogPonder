@@ -14,14 +14,15 @@ To install the dependencies, you need [Conda](https://conda.io/projects/conda/en
 ```bash
 mamba create -f environment.yml
 mamba activate ponder
-dvc update -R data  # download the required SRO data using DVC
+dvc update --rev master -R data  # download the data using DVC
 ```
 
 ## Notebooks
 
 The notebooks are organized as follows:
 
-- `notebooks/Fixed Hyperparameters.ipynb`: Running the pipeline with some common choices of hyperparameters.
+- `notebooks/1 N-Back (Fixed HP).ipynb`: Running the pipeline with some common choices of hyperparameters.
+- `notebooks/2 Stroop (Fixed HP).ipynb`: Running the pipeline with some common choices of hyperparameters.
 - `notebooks/Hyperparameter Tuning.ipynb`: Uses Ray Tune to optimize the hyperparameters.
 
 ## Data
