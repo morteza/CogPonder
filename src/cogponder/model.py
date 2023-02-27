@@ -62,7 +62,7 @@ class CogPonderModel(LightningModule):
 
     def forward(self, context, x):
 
-        """_summary_
+        """CogPonder forward pass
 
         Args
         ----
@@ -89,6 +89,8 @@ class CogPonderModel(LightningModule):
                 lambda_n = torch.ones((batch_size,), device=self.device)
             else:
                 lambda_n = self.halt_node(h)[:, 0]
+
+            print('INFO', batch_size, x.shape, h.shape)
 
             y_step = self.output_node(h)
             h = self.recurrent_node(x, h)
@@ -121,35 +123,13 @@ class CogPonderModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        contexts, X, trial_types, is_corrects, responses, rt_true = batch
-        y_true = responses.long()
-
-        # task-specific cleanups
-        match self.task:
-            case 'nback':
-                valid_response_mask = (rt_true > 0) & (responses != 0)
-                contexts = contexts[valid_response_mask, ...]
-                X = X[valid_response_mask, ...]
-                trial_types = trial_types[valid_response_mask]
-                y_true = y_true[valid_response_mask]
-                rt_true = rt_true[valid_response_mask]
-            case 'stroop':
-                # remove invalid trials (no response)
-                valid_response_mask = (responses != -1)
-                contexts = contexts[valid_response_mask, ...]
-                X = X[valid_response_mask, :]
-                trial_types = trial_types[valid_response_mask]
-                y_true = y_true[valid_response_mask]
-                rt_true = rt_true[valid_response_mask]
-            case _:
-                raise Exception(f'Invalid cognitive task: {self.task}')
+        contexts, stimuli, trial_types, responses, rt_true, _ = batch
 
         # forward pass
-        y_steps, p_halts, rt_pred = self.forward(contexts, X)
-        
-        print(y_steps.shape, p_halts.shape, rt_pred.shape)
+        y_steps, p_halts, rt_pred = self.forward(contexts, stimuli)
+
         # compute losses
-        resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true)
+        resp_loss = self.resp_loss_fn(p_halts, y_steps, responses)
         time_loss = self.time_loss_fn(p_halts, rt_true, logger=self.logger.experiment, step=self.global_step)
         loss = self.resp_loss_beta * resp_loss + self.time_loss_beta * time_loss
 
@@ -169,38 +149,16 @@ class CogPonderModel(LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        contexts, X, trial_types, is_corrects, responses, rt_true = batch
-        print('val contexts', torch.unique(contexts))
-        y_true = responses.long()
-
-        # task-specific cleanups
-        match self.task:
-            case 'nback':
-                valid_response_mask = (rt_true > 0) & (responses != 0)
-                contexts = contexts[valid_response_mask, ...]
-                X = X[valid_response_mask, ...]
-                trial_types = trial_types[valid_response_mask]
-                y_true = y_true[valid_response_mask]
-                rt_true = rt_true[valid_response_mask]
-            case 'stroop':
-                # remove invalid trials (no response)
-                valid_response_mask = (responses != -1)
-                contexts = contexts[valid_response_mask, ...]
-                X = X[valid_response_mask, :]
-                trial_types = trial_types[valid_response_mask]
-                y_true = y_true[valid_response_mask]
-                rt_true = rt_true[valid_response_mask]
-            case _:
-                raise Exception(f'Invalid cognitive task: {self.task}')
+        contexts, stimuli, trial_types, responses, rt_true, _ = batch
 
         # forward pass
-        y_steps, p_halts, rt_pred = self.forward(contexts, X)
+        y_steps, p_halts, rt_pred = self.forward(contexts, stimuli)
         y_pred = torch.argmax(y_steps, dim=-1).gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
 
         print(y_steps.shape, p_halts.shape, rt_pred.shape)
 
         # compute losses
-        resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true)
+        resp_loss = self.resp_loss_fn(p_halts, y_steps, responses)
         time_loss = self.time_loss_fn(p_halts, rt_true)
         loss = self.resp_loss_beta * resp_loss + self.time_loss_beta * time_loss
 
@@ -219,7 +177,7 @@ class CogPonderModel(LightningModule):
                 # self.log('val/accuracy', self.val_accuracy, on_epoch=True)
                 pass
             case 'stroop':
-                is_corrects_pred = (y_pred.long() == y_true).float()
+                is_corrects_pred = (y_pred.long() == responses).float()
                 cong_is_corrects = torch.where(trial_types == 1, is_corrects_pred, torch.nan)
                 incong_is_corrects = torch.where(trial_types == 0, is_corrects_pred, torch.nan)
 

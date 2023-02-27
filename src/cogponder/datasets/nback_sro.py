@@ -113,22 +113,22 @@ class NBackSRODataset(Dataset):
         data['response_step'] = (data['rt'] / self.response_step_interval).apply(np.round)
 
         # discard trials with invalid targets, e.g., burn-in trials
-        valid_trials_mask = data['target'].notna().index
+        data = data.query('target.notna() and rt>=0').copy()
 
         # to numpy
-        subject_ids = data['worker_id'].astype('category').cat.codes
-        stimulus = data['stim'].str.upper().astype('category').cat.codes
-        trial_types = data['matched'].loc[valid_trials_mask].values
-        responses = data['key_press'].astype('category').cat.codes.loc[valid_trials_mask].values
-        response_steps = data['response_step'].loc[valid_trials_mask].values
-        corrects = data['correct'].loc[valid_trials_mask].values
+        worker_ids = data['worker_id'].astype('category').cat.codes.values
+        stimuli = data['stim'].str.upper().astype('category').cat.codes.values
+        trial_types = data['matched'].values
+        responses = data['key_press'].astype('category').cat.codes.values
+        response_steps = data['response_step'].values
+        corrects = data['correct'].values
 
         # to tensors
-        subject_ids = torch.tensor(subject_ids, dtype=torch.long)
-        stimulus = torch.tensor(stimulus, dtype=torch.long)
-        trial_types = torch.tensor(trial_types, dtype=torch.long)
-        responses = torch.tensor(responses, dtype=torch.long)
-        response_steps = torch.tensor(response_steps, dtype=torch.long)
-        corrects = torch.tensor(corrects, dtype=torch.bool)
+        worker_ids = torch.tensor(worker_ids, dtype=torch.long).reshape(-1, 1)
+        stimuli = torch.tensor(stimuli, dtype=torch.long).reshape(-1, 1)
+        trial_types = torch.tensor(trial_types, dtype=torch.long).reshape(-1, 1)
+        responses = torch.tensor(responses, dtype=torch.long).reshape(-1, 1)
+        response_steps = torch.tensor(response_steps, dtype=torch.long).reshape(-1, 1)
+        corrects = torch.tensor(corrects, dtype=torch.bool).reshape(-1, 1)
 
-        return (subject_ids, stimulus, trial_types, responses, response_steps, corrects)
+        return (worker_ids, stimuli, trial_types, responses, response_steps, corrects)
