@@ -1,7 +1,9 @@
-from urllib import response
 import torch
 import pandas as pd
+from typing import Union
 from torch.utils.data import Dataset
+import numpy as np
+from .utils import remove_non_decision_time
 
 
 class StroopSRODataset(Dataset):
@@ -13,7 +15,7 @@ class StroopSRODataset(Dataset):
         self,
         n_subjects=-1,
         response_step_interval=10,
-        non_decision_time='auto',  # int (in millis) or 'auto'
+        non_decision_time: Union[str, int] = 'auto',
         data_file='data/Self_Regulation_Ontology/stroop.csv.gz'
     ):
 
@@ -28,6 +30,8 @@ class StroopSRODataset(Dataset):
                 If 'auto', it will be estimated as the minimum of response times per subject,
                 mapping values to 1..(max-min+1).
                 If None, no subtraction will be performed.
+            data_file (File, optional):
+                Overrides path to the SRO compressed file containing the data; original file name: stroop.csv.gz.
         """
 
         self.n_subjects = n_subjects
@@ -36,8 +40,7 @@ class StroopSRODataset(Dataset):
         self.data_file = data_file
 
         # load and cleanup the data
-        data = self.prepare_data()
-        self.X, self.trial_types, self.is_corrects, self.responses, self.response_steps = data
+        self._data = self.prepare_data(self.n_subjects)
 
     def __len__(self):
         """Get the number of samples.
@@ -48,35 +51,41 @@ class StroopSRODataset(Dataset):
         """Get a feature vector and it's target label.
         """
 
-        return (self.X[idx],
-                self.trial_types[idx],
-                self.is_corrects[idx],
-                self.responses[idx],
-                self.response_steps[idx, :])
+        _item = []
+
+        for x in self._data:
+            _item.append(x[idx])
+
+        return tuple(_item)
 
     def prepare_data(self,
+                     n_subjects,
                      colors_order=['red', 'green', 'blue'],
-                     color_codes={66: 'blue', 71: 'green', 82: 'red'}):
+                     color_codes={66: 'blue', 71: 'green', 82: 'red'},
+                     **kwargs):
         """[summary]
+
         Args:
-            response_step_interval (int):
-                Size of the bins for the response time in millis.
-            data_file (File):
-                SRO compressed file containing the data; original file name: stroop.csv.gz.
+            color_order (list):
+                order of colors in the dataset.
+            color_codes (dict):
+                mapping of color codes to color names.
 
         Returns:
-            X: stimulus features
+            subject_ids:
+                subject index.
+            stimulus:
                 Stroop stimulus features. dim0 is the ink color (i.e., target) and dim1 is the word.
-                shape: (n_subjects, n_trials, 2).
-            trial_types: whether it was a congruent or incongruent trial.
-                To match tensor datatypes, 0=incongruent, 1=congruent.
-                shape: (n_subjects, n_trials)
-            is_corrects: target labels, either 0 (incorrect) or  1 (correct).
-                shape: (n_subjects, n_trials)
-            responses: the pressed key, representing the color of the word.
-                shape: (n_subjects, n_trials)
-            response_times: response time of each trial.
-                shape: (n_subjects, n_trials)
+                shape: (-1, 2).
+            trial_types:
+                whether it was a congruent or incongruent trial. To match tensor datatypes, 0=incongruent, 1=congruent.
+                shape: (n_trials)
+            responses:
+                the pressed key, representing the color of the word.
+            response_steps:
+                response time (refined to steps).
+            corrects:
+                whether recorded response was correct or not. Either 0 (incorrect) or  1 (correct).
         """
 
         # TODO support multi subject by querying worker_id
@@ -89,68 +98,51 @@ class StroopSRODataset(Dataset):
                 'stim_word': 'category',
                 'condition': 'category'})
 
-        selected_worker_ids = data['worker_id'].unique()[:self.n_subjects]  # noqa: F841
-        n_selected_subjects = len(selected_worker_ids)
+        # figure out worker_ids to load
+        worker_ids = kwargs.get('worker_ids', [])
 
-        # filter out practice and no-response trials
-        data = data.query('worker_id in @selected_worker_ids and '
+        if len(worker_ids) == 0:
+            worker_ids = data['worker_id'].unique()[:n_subjects]
+
+        # filter out worker_ids and practice trials
+        data = data.query('worker_id in @worker_ids and '
                           'exp_stage == "test"').copy()
 
-        data['worker_id'] = data['worker_id'].astype('category')
-
+        # make sure everything is in the right order
         data['key_press'] = data['key_press'].astype('int').map(color_codes).astype('category')
-
         data['key_press'] = data['key_press'].cat.reorder_categories(colors_order)
         data['stim_color'] = data['stim_color'].cat.reorder_categories(colors_order)
         data['stim_word'] = data['stim_word'].cat.reorder_categories(colors_order)
+        # encode as integers
+        data['stim_color'] = data['stim_color'].cat.codes.values
+        data['stim_word'] = data['stim_word'].cat.codes.values
 
         # making sure "incongruent" casts to 0 and "congruent" casts to 1
         data['condition'] = data['condition'].cat.reorder_categories(['incongruent', 'congruent'])
 
-        data = data.sort_index(ascending=True)
-        stim_color = data['stim_color'].cat.codes
-        stim_color = torch.tensor(stim_color.values).reshape(-1, 1)
-
-        stim_word = data['stim_word'].cat.codes
-        stim_word = torch.tensor(stim_word.values).reshape(-1, 1)
-
-        worker_ids = data['worker_id'].cat.codes
-        worker_ids = torch.tensor(worker_ids.values).reshape(-1, 1)
-
-        X = torch.cat((worker_ids, stim_color, stim_word), dim=1).float()
-
-        X = X.reshape(n_selected_subjects, -1, 3)  # (n_subjects, n_trials, 3)
-
-        trial_types = torch.tensor(data['condition'].cat.codes.values)
-        trial_types = trial_types.reshape(n_selected_subjects, -1).float()  # (n_subjects, n_trials)
-
-        is_corrects = torch.tensor(data['correct'].values)
-        is_corrects = is_corrects.reshape(n_selected_subjects, -1).float()  # (n_subjects, n_trials)
-
-        responses = torch.tensor(data['key_press'].cat.codes.values)
-        responses = responses.reshape(n_selected_subjects, -1)  # (n_subjects, n_trials)
-
-        # convert RTs to steps
-        response_times = torch.tensor(data['rt'].values)
-        response_times = response_times.reshape(n_selected_subjects, -1)  # (n_subjects, n_trials)
-
         # automatically calculate non-decision time (min RT - 1-step)
         if self.non_decision_time == 'auto':
-            valid_rts = torch.where(response_times <= 0, torch.inf, response_times)
-            min_rt = torch.min(valid_rts, dim=1, keepdim=True)[0]
-            self.non_decision_time = min_rt - self.response_step_interval
+            data['rt'] = data.groupby(['worker_id'])['rt'].transform(remove_non_decision_time,
+                                                                     response_step_interval=self.response_step_interval)
+        data['response_step'] = (data['rt'] / self.response_step_interval).apply(np.round)
 
-        # subtract non decision time
-        response_times = torch.where(response_times <= 0,
-                                     0, response_times - self.non_decision_time)
+        # discard trials with invalid targets, e.g., burn-in trials
+        data = data.query('key_press.notna() and rt>=0').copy()
 
-        # convert to steps
-        response_steps = torch.round(response_times / self.response_step_interval).int()
+        # to numpy
+        worker_ids = data['worker_id'].astype('category').cat.codes.values
+        stimuli = data[['stim_color', 'stim_word']].values
+        trial_types = data['condition'].cat.codes.values
+        responses = data['key_press'].cat.codes.values
+        response_steps = data['response_step'].values
+        corrects = data['correct'].values
 
-        return (
-            X,
-            trial_types,
-            is_corrects,
-            responses,
-            response_steps
-        )
+        # to tensors
+        worker_ids = torch.tensor(worker_ids, dtype=torch.long).reshape(-1,)
+        stimuli = torch.tensor(stimuli, dtype=torch.float).reshape(-1, 2)
+        trial_types = torch.tensor(trial_types, dtype=torch.long).reshape(-1,)
+        responses = torch.tensor(responses, dtype=torch.long).reshape(-1,)
+        response_steps = torch.tensor(response_steps, dtype=torch.long).reshape(-1,)
+        corrects = torch.tensor(corrects, dtype=torch.bool).reshape(-1,)
+
+        return (worker_ids, stimuli, trial_types, responses, response_steps, corrects)

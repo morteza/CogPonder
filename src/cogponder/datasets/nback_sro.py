@@ -3,6 +3,7 @@ import pandas as pd
 from torch.utils.data import Dataset
 from typing import Union
 import numpy as np
+from .utils import remove_non_decision_time
 
 
 class NBackSRODataset(Dataset):
@@ -51,16 +52,8 @@ class NBackSRODataset(Dataset):
 
         return tuple(_item)
 
-    def _remove_non_decision_time(self, rts: pd.Series, response_step_interval=20):
-        rts[rts <= 0] = pd.NA
-        ndt = rts.min() - response_step_interval
-        rts = rts.apply(lambda rt: rt - ndt if rt > 0 else rt)
-        return rts
-
     def prepare_data(self, n_subjects, n_back, **kwargs):
         """[summary]
-        # TODO required data columns:
-        #   subject_index, trial_index, stimulus_index, accuracy, response_time
 
         Args:
             n_subjects (int): number of subjects to load. -1 for all subjects.
@@ -108,7 +101,7 @@ class NBackSRODataset(Dataset):
 
         # automatically calculate non-decision time (min RT - 1-step)
         if self.non_decision_time == 'auto':
-            data['rt'] = data.groupby(['worker_id'])['rt'].transform(self._remove_non_decision_time,
+            data['rt'] = data.groupby(['worker_id'])['rt'].transform(remove_non_decision_time,
                                                                      response_step_interval=self.response_step_interval)
         data['response_step'] = (data['rt'] / self.response_step_interval).apply(np.round)
 
