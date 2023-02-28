@@ -127,7 +127,7 @@ class NBackSRODataset(Dataset):
         worker_ids = torch.tensor(worker_ids, dtype=torch.long).reshape(-1,)
         stimuli = torch.tensor(stimuli, dtype=torch.float).reshape(-1, 1)
         trial_types = torch.tensor(trial_types, dtype=torch.long).reshape(-1,)
-        responses = torch.tensor(responses, dtype=torch.long).reshape(-1, 1)
+        responses = torch.tensor(responses, dtype=torch.long).reshape(-1,)
         response_steps = torch.tensor(response_steps, dtype=torch.long).reshape(-1,)
         corrects = torch.tensor(corrects, dtype=torch.bool).reshape(-1,)
 
