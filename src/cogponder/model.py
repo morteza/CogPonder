@@ -67,7 +67,7 @@ class CogPonderModel(LightningModule):
         Args
         ----
             context (torch.Tensor): contextual information of shape (batch_size,)
-            x (torch.Tensor): input data of shape (batch_size, n_contexts, inputs_dim)
+            x (torch.Tensor): input data of shape (batch_size, inputs_dim)
 
         Returns
         -------
@@ -89,8 +89,6 @@ class CogPonderModel(LightningModule):
                 lambda_n = torch.ones((batch_size,), device=self.device)
             else:
                 lambda_n = self.halt_node(h)[:, 0]
-
-            print('INFO', batch_size, x.shape, h.shape)
 
             y_step = self.output_node(h)
             h = self.recurrent_node(x, h)

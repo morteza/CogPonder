@@ -124,11 +124,11 @@ class NBackSRODataset(Dataset):
         corrects = data['correct'].values
 
         # to tensors
-        worker_ids = torch.tensor(worker_ids, dtype=torch.long).reshape(-1, 1)
-        stimuli = torch.tensor(stimuli, dtype=torch.long).reshape(-1, 1)
-        trial_types = torch.tensor(trial_types, dtype=torch.long).reshape(-1, 1)
+        worker_ids = torch.tensor(worker_ids, dtype=torch.long).reshape(-1,)
+        stimuli = torch.tensor(stimuli, dtype=torch.float).reshape(-1, 1)
+        trial_types = torch.tensor(trial_types, dtype=torch.long).reshape(-1,)
         responses = torch.tensor(responses, dtype=torch.long).reshape(-1, 1)
-        response_steps = torch.tensor(response_steps, dtype=torch.long).reshape(-1, 1)
-        corrects = torch.tensor(corrects, dtype=torch.bool).reshape(-1, 1)
+        response_steps = torch.tensor(response_steps, dtype=torch.long).reshape(-1,)
+        corrects = torch.tensor(corrects, dtype=torch.bool).reshape(-1,)
 
         return (worker_ids, stimuli, trial_types, responses, response_steps, corrects)
