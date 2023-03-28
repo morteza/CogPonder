@@ -1,5 +1,3 @@
-import os
-from attr import attr
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader, TensorDataset, random_split, Subset
@@ -10,7 +8,7 @@ class CogPonderDataModule(pl.LightningDataModule):
 
     def __init__(
         self,
-        dataset,
+        dataset: Dataset,
         train_ratio=.75,
         batch_size=4,
         randomized_split=False,
@@ -19,7 +17,7 @@ class CogPonderDataModule(pl.LightningDataModule):
         super().__init__()
         self.save_hyperparameters(ignore=['dataset'], logger=False)
 
-        # only the first subject is used
+        # wrap dataset with tensor dataset
         self.dataset = TensorDataset(*dataset[:])
 
         self.train_ratio = train_ratio
