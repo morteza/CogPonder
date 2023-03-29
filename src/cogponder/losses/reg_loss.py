@@ -20,16 +20,6 @@ class RegularizationLoss(nn.Module):
         self.by_trial_type = by_trial_type
         self.kl_div = nn.KLDivLoss(reduction='batchmean')
 
-        # 1. stores the geometric distribution at each step
-        p_g = torch.zeros((self.max_steps,))
-
-        not_halted = 1.0  # initial probability of not having halted
-
-        for step in range(self.max_steps):
-            p_g[step] = not_halted * self.lambda_p
-            not_halted = not_halted * (1 - self.lambda_p)
-        self.register_buffer('p_g', p_g)  # persist p_g
-
     def forward(self, trial_types, p_halts, halt_steps, response_steps):
         """Compute reg_loss.
 
