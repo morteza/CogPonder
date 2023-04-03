@@ -1,4 +1,4 @@
-from .model import CogPonderModel
+from .models.cogponder import CogPonderModel
 
 
 __all__ = [

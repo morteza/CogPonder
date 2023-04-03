@@ -12,17 +12,17 @@ To install the dependencies, you need [Conda](https://conda.io/projects/conda/en
 
 
 ```bash
-mamba create -f environment.yml
-mamba activate ponder
-dvc update --rev master -R data  # download the data using DVC
+mamba create -f env.yml
+mamba activate cogponder
+dvc update --rev master -R data  # import the SRO data using DVC
 ```
 
 ## Notebooks
 
 The notebooks are organized as follows:
 
-- `notebooks/1 N-Back (Fixed HP).ipynb`: Running the pipeline with some common choices of hyperparameters.
-- `notebooks/2 Stroop (Fixed HP).ipynb`: Running the pipeline with some common choices of hyperparameters.
+- `notebooks/1 N-Back.ipynb`: Running the agent on the 2-back test using some manual choices of hyperparameters.
+- `notebooks/2 Stroop.ipynb`: Running the agent on the Stroop test using some manual choices of hyperparameters.
 - `notebooks/Hyperparameter Tuning.ipynb`: Uses Ray Tune to optimize the hyperparameters.
 
 ## Data
