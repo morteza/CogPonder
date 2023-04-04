@@ -18,6 +18,7 @@ class CogPonderModel(LightningModule):
         embeddings_dim,
         max_response_step,
         n_contexts=1,
+        context_embeddings_dim=4,
         response_loss_beta=1.,
         time_loss_beta=1.,
         learning_rate=1e-3,
@@ -32,6 +33,7 @@ class CogPonderModel(LightningModule):
             embeddings_dim (int): dimensionality of embeddings
             max_response_step (int): maximum number of response steps
             n_contexts (int): number of contexts (i.e., embeddings). Defaults to 1.
+            context_embeddings_dim (int): dimensionality of context embeddings. Defaults to 4.
             response_loss_beta (float): weight of response loss. Defaults to 1.
             time_loss_beta (float): weight of response time loss. Defaults to 1.
             learning_rate (float): learning rate, defaults to 1e-3.
@@ -65,13 +67,13 @@ class CogPonderModel(LightningModule):
         self.halt_node = HaltingModule(self.embeddings_dim, self.max_response_step)
         self.recurrence_node = RecurrenceModule(self.inputs_dim, self.embeddings_dim)
 
-        # init contextual embeddings
-        self.embeddings = nn.Embedding(
-            self.n_contexts,
-            self.embeddings_dim,
-            device=self.device)
+        # init contextual embeddings (e.g., subject)
+        self.context_embeddings = nn.Embedding(self.n_contexts, self.context_embeddings_dim)
 
-    def forward(self, x, context):
+        # init embeddings
+        self.embeddings = nn.Embedding(self.n_contexts, self.embeddings_dim)
+
+    def forward(self, x, context_ids=None):
 
         """CogPonder forward pass
 
@@ -87,8 +89,12 @@ class CogPonderModel(LightningModule):
 
         batch_size = x.size(0)
 
+        # append context-specific embeddings to input
+        context_features = self.context_embeddings(context_ids)
+        x = torch.cat([x, context_features], dim=1)
+
         # init parameters
-        h = self.embeddings(context)
+        h = self.embeddings(context_ids)
         p_continue = torch.ones(batch_size, device=self.device)
         halt_steps = torch.zeros(batch_size, dtype=torch.long, device=self.device)
         y_list = []  # list of y_steps (step-wise responses)
@@ -135,7 +141,7 @@ class CogPonderModel(LightningModule):
         contexts, stimuli, trial_types, responses, rt_true, _ = batch
 
         # forward pass
-        y_steps, p_halts, rt_pred = self.forward(contexts, stimuli)
+        y_steps, p_halts, rt_pred = self.forward(stimuli, contexts)
 
         # compute losses
         resp_loss = self.resp_loss_fn(p_halts, y_steps, responses)
@@ -161,7 +167,7 @@ class CogPonderModel(LightningModule):
         contexts, stimuli, trial_types, responses, rt_true, _ = batch
 
         # forward pass
-        y_steps, p_halts, rt_pred = self.forward(contexts, stimuli)
+        y_steps, p_halts, rt_pred = self.forward(stimuli, contexts)
         y_pred = torch.argmax(y_steps, dim=-1).gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
 
         print(y_steps.shape, p_halts.shape, rt_pred.shape)
