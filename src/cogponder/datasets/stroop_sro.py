@@ -63,7 +63,7 @@ class StroopSRODataset(Dataset):
         data = data.query('worker_id in @worker_ids and exp_stage == "test"').copy()
 
         data.sort_index(inplace=True)
-        data['trial_index'] = data.groupby('worker_id').cumcount() + 1
+        data['trial_index'] = data.groupby('worker_id').cumcount()
 
         sro_conditions = {'incongruent': 0, 'congruent': 1}
         sro_colors = {-1: 'timeout', 66: 'blue', 71: 'green', 82: 'red'}
@@ -79,8 +79,8 @@ class StroopSRODataset(Dataset):
         data['stim_word'] = data['stim_word'].astype('category').cat.set_categories(sro_colors.values(), ordered=True)
 
         # encode categorical variables
-        data['worker_id'] = data['worker_id'].cat.codes.astype('int') + 1  # start at 1
-        data['condition'] = data['condition'].cat.codes.astype('int')
+        data['worker_id'] = data['worker_id'].cat.codes.astype('int')   # start at 0
+        data['condition'] = data['condition'].cat.codes.astype('int')   # start at 0
         data['key_press'] = data['key_press'].cat.codes.astype('int')
         data['stim_color'] = data['stim_color'].cat.codes.astype('float32')
         data['stim_word'] = data['stim_word'].cat.codes.astype('float32')

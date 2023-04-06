@@ -52,7 +52,7 @@ class CogPonderModel(LightningModule):
         self.max_response_step = max_response_step
         self.n_contexts = n_contexts
         self.n_subjects = n_subjects
-        self.subject_embeddings_dim = subject_embeddings_dim
+        self.subject_embeddings_dim = subject_embeddings_dim if n_subjects is not None else 0
         self.response_loss_beta = response_loss_beta
         self.time_loss_beta = time_loss_beta
         self.learning_rate = learning_rate
@@ -60,10 +60,6 @@ class CogPonderModel(LightningModule):
 
         # self.train_accuracy = torchmetrics.Accuracy(task='multiclass')
         # self.val_accuracy = torchmetrics.Accuracy(task='multiclass')
-
-        # init losses
-        self.resp_loss_fn = ResponseLoss()
-        self.time_loss_fn = ResponseTimeLoss(self.max_response_step)
 
         # init nodes
         self.operator_node = SimpleOperatorModule(self.embeddings_dim, self.outputs_dim)
@@ -77,6 +73,10 @@ class CogPonderModel(LightningModule):
 
         # init embeddings
         self.embeddings = nn.Embedding(self.n_contexts, self.embeddings_dim, dtype=torch.float)
+
+        # init losses
+        self.resp_loss_fn = ResponseLoss()
+        self.time_loss_fn = ResponseTimeLoss(self.max_response_step)
 
     def forward(self, x, subject_ids, context_ids):
 
@@ -141,24 +141,29 @@ class CogPonderModel(LightningModule):
             p_steps[halt_step:, i] = 0.0
             p_steps[halt_step, i] = 1 - p_steps[:halt_step, i].sum()
 
-        return y_steps, p_steps, halt_steps
+        # gather response at halting time
+        y_pred = torch.argmax(y_steps, dim=-1).gather(dim=0, index=halt_steps[None, :] - 1,)[0]
+
+        return y_steps, y_pred, p_steps, halt_steps
 
     def training_step(self, batch, batch_idx):
 
         _, subject_ids, contexts, stimuli, responses, rt_true, _ = batch
 
         # forward pass
-        y_steps, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
+        y_steps, y_pred, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
 
         # compute losses
         resp_loss = self.resp_loss_fn(p_halts, y_steps, responses)
         time_loss = self.time_loss_fn(p_halts, rt_true)
         loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss
+        accuracy = (y_pred.int() == responses.int()).float().mean()
 
         # log losses
         self.log('train/resp_loss', resp_loss)
         self.log('train/time_loss', time_loss)
         self.log('train/total_loss', loss)
+        self.log('train/accuracy', accuracy)
 
         # compute and log accuracy (assuming binary classification)
         # y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
@@ -173,42 +178,41 @@ class CogPonderModel(LightningModule):
 
         _, subject_ids, contexts, stimuli, responses, rt_true, _ = batch
 
-        print(contexts)
         # forward pass
-        y_steps, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
-        y_pred = torch.argmax(y_steps, dim=-1).gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
+        y_steps, y_pred, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
 
         # compute losses
         resp_loss = self.resp_loss_fn(p_halts, y_steps, responses)
         time_loss = self.time_loss_fn(p_halts, rt_true)
         loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss
+        accuracy = (y_pred.int() == responses.int()).float().mean()
 
         # log losses
         self.log('val/resp_loss', resp_loss)
         self.log('val/time_loss', time_loss)
         self.log('val/total_loss', loss)
+        self.log('val/accuracy', accuracy)
 
-        match self.task:
-            case 'nback':
-                # compute and log accuracy (assuming binary classification)
-                # y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
-                # accuracy = (y_pred.int() == y_true.int()).float().mean()
-                # self.log('val/accuracy', accuracy, on_epoch=True)
-                # self.val_accuracy(y_pred, y_true.int())
-                # self.log('val/accuracy', self.val_accuracy, on_epoch=True)
-                pass
-            case 'stroop':
-                is_corrects_pred = (y_pred.long() == responses).float()
-                incong_is_corrects = torch.where(contexts == 0, is_corrects_pred, torch.nan)
-                cong_is_corrects = torch.where(contexts == 1, is_corrects_pred, torch.nan)
+        # match self.task:
+        #     case 'nback':
+        #         # compute and log accuracy (assuming binary classification)
+        #         # accuracy = (y_pred.int() == y_true.int()).float().mean()
+        #         # self.log('val/accuracy', accuracy, on_epoch=True)
+        #         # self.val_accuracy(y_pred, y_true.int())
+        #         # self.log('val/accuracy', self.val_accuracy, on_epoch=True)
+        #         pass
+        #     case 'stroop':
+        #         is_corrects_pred = (y_pred.long() == responses).float()
+        #         incong_is_corrects = torch.where(contexts == 0, is_corrects_pred, torch.nan)
+        #         cong_is_corrects = torch.where(contexts == 1, is_corrects_pred, torch.nan)
 
-                accuracy = torch.nanmean(is_corrects_pred)
-                incong_accuracy = torch.nanmean(incong_is_corrects)
-                cong_accuracy = torch.nanmean(cong_is_corrects)
+        #         accuracy = torch.nanmean(is_corrects_pred)
+        #         incong_accuracy = torch.nanmean(incong_is_corrects)
+        #         cong_accuracy = torch.nanmean(cong_is_corrects)
 
-                self.log('val/accuracy', accuracy, on_epoch=True)
-                self.log('val/accuracy_congruent', cong_accuracy, on_epoch=True)
-                self.log('val/accuracy_incongruent', incong_accuracy, on_epoch=True)
+        #         self.log('val/accuracy', accuracy, on_epoch=True)
+        #         self.log('val/accuracy_congruent', cong_accuracy, on_epoch=True)
+        #         self.log('val/accuracy_incongruent', incong_accuracy, on_epoch=True)
 
         return loss
 
