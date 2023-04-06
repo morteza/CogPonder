@@ -25,7 +25,7 @@ class CogPonderDataModule(pl.LightningDataModule):
         self.randomized_split = randomized_split
         self.num_workers = num_workers
 
-    def prepare_data(self) -> None:
+    def prepare_data(self):
 
         train_size = int(len(self.dataset) * self.train_ratio)
         test_size = len(self.dataset) - train_size

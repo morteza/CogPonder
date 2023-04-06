@@ -18,7 +18,8 @@ class CogPonderModel(LightningModule):
         embeddings_dim,
         max_response_step,
         n_contexts=1,
-        context_embeddings_dim=4,
+        n_subjects=None,
+        subject_embeddings_dim=0,
         response_loss_beta=1.,
         time_loss_beta=1.,
         learning_rate=1e-3,
@@ -33,7 +34,7 @@ class CogPonderModel(LightningModule):
             embeddings_dim (int): dimensionality of embeddings
             max_response_step (int): maximum number of response steps
             n_contexts (int): number of contexts (i.e., embeddings). Defaults to 1.
-            context_embeddings_dim (int): dimensionality of context embeddings. Defaults to 4.
+            subject_embeddings_dim (int): dimensionality of subject embeddings. Defaults to 4.
             response_loss_beta (float): weight of response loss. Defaults to 1.
             time_loss_beta (float): weight of response time loss. Defaults to 1.
             learning_rate (float): learning rate, defaults to 1e-3.
@@ -50,7 +51,8 @@ class CogPonderModel(LightningModule):
         self.embeddings_dim = embeddings_dim
         self.max_response_step = max_response_step
         self.n_contexts = n_contexts
-        self.context_embeddings_dim = context_embeddings_dim
+        self.n_subjects = n_subjects
+        self.subject_embeddings_dim = subject_embeddings_dim
         self.response_loss_beta = response_loss_beta
         self.time_loss_beta = time_loss_beta
         self.learning_rate = learning_rate
@@ -66,16 +68,17 @@ class CogPonderModel(LightningModule):
         # init nodes
         self.operator_node = SimpleOperatorModule(self.embeddings_dim, self.outputs_dim)
         self.halt_node = HaltingModule(self.embeddings_dim, self.max_response_step)
-        self.recurrence_node = RecurrenceModule(self.inputs_dim + self.context_embeddings_dim,
+        self.recurrence_node = RecurrenceModule(self.inputs_dim + self.subject_embeddings_dim,
                                                 self.embeddings_dim)
 
-        # init contextual embeddings (e.g., subject)
-        self.context_embeddings = nn.Embedding(self.n_contexts, self.context_embeddings_dim)
+        # init subject embeddings (if applicable)
+        if self.n_subjects is not None:
+            self.subject_embeddings = nn.Embedding(self.n_subjects, self.subject_embeddings_dim, dtype=torch.float)
 
         # init embeddings
-        self.embeddings = nn.Embedding(self.n_contexts, self.embeddings_dim)
+        self.embeddings = nn.Embedding(self.n_contexts, self.embeddings_dim, dtype=torch.float)
 
-    def forward(self, x, context_ids=None):
+    def forward(self, x, subject_ids, context_ids):
 
         """CogPonder forward pass
 
@@ -91,12 +94,14 @@ class CogPonderModel(LightningModule):
 
         batch_size = x.size(0)
 
-        # append context-specific embeddings to input
-        context_features = self.context_embeddings(context_ids)
-        x = torch.cat([x, context_features], dim=1)
+        # append subject-specific embeddings to the input
+        if self.n_subjects is not None:
+            subject_features = self.subject_embeddings(subject_ids)
+            x = torch.cat([x, subject_features], dim=1)
 
         # init parameters
         h = self.embeddings(context_ids)
+
         p_continue = torch.ones(batch_size, device=self.device)
         halt_steps = torch.zeros(batch_size, dtype=torch.long, device=self.device)
         y_list = []  # list of y_steps (step-wise responses)
@@ -140,20 +145,20 @@ class CogPonderModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        contexts, stimuli, trial_types, responses, rt_true, _ = batch
+        _, subject_ids, contexts, stimuli, responses, rt_true, _ = batch
 
         # forward pass
-        y_steps, p_halts, rt_pred = self.forward(stimuli, contexts)
+        y_steps, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
 
         # compute losses
         resp_loss = self.resp_loss_fn(p_halts, y_steps, responses)
-        time_loss = self.time_loss_fn(p_halts, rt_true, logger=self.logger.experiment, step=self.global_step)
+        time_loss = self.time_loss_fn(p_halts, rt_true)
         loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss
 
         # log losses
-        self.log('train/resp_loss', resp_loss, on_epoch=True, on_step=False)
-        self.log('train/time_loss', time_loss, on_epoch=True, on_step=False)
-        self.log('train/total_loss', loss, on_epoch=True, logger=True, on_step=False)
+        self.log('train/resp_loss', resp_loss)
+        self.log('train/time_loss', time_loss)
+        self.log('train/total_loss', loss)
 
         # compute and log accuracy (assuming binary classification)
         # y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
@@ -166,10 +171,11 @@ class CogPonderModel(LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        contexts, stimuli, trial_types, responses, rt_true, _ = batch
+        _, subject_ids, contexts, stimuli, responses, rt_true, _ = batch
 
+        print(contexts)
         # forward pass
-        y_steps, p_halts, rt_pred = self.forward(stimuli, contexts)
+        y_steps, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
         y_pred = torch.argmax(y_steps, dim=-1).gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
 
         # compute losses
@@ -178,9 +184,9 @@ class CogPonderModel(LightningModule):
         loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss
 
         # log losses
-        self.log('val/resp_loss', resp_loss, on_epoch=True, on_step=False)
-        self.log('val/time_loss', time_loss, on_epoch=True, on_step=False)
-        self.log('val/total_loss', loss, on_epoch=True, logger=True, on_step=False)
+        self.log('val/resp_loss', resp_loss)
+        self.log('val/time_loss', time_loss)
+        self.log('val/total_loss', loss)
 
         match self.task:
             case 'nback':
@@ -193,12 +199,12 @@ class CogPonderModel(LightningModule):
                 pass
             case 'stroop':
                 is_corrects_pred = (y_pred.long() == responses).float()
-                cong_is_corrects = torch.where(trial_types == 1, is_corrects_pred, torch.nan)
-                incong_is_corrects = torch.where(trial_types == 0, is_corrects_pred, torch.nan)
+                incong_is_corrects = torch.where(contexts == 0, is_corrects_pred, torch.nan)
+                cong_is_corrects = torch.where(contexts == 1, is_corrects_pred, torch.nan)
 
                 accuracy = torch.nanmean(is_corrects_pred)
-                cong_accuracy = torch.nanmean(cong_is_corrects)
                 incong_accuracy = torch.nanmean(incong_is_corrects)
+                cong_accuracy = torch.nanmean(cong_is_corrects)
 
                 self.log('val/accuracy', accuracy, on_epoch=True)
                 self.log('val/accuracy_congruent', cong_accuracy, on_epoch=True)

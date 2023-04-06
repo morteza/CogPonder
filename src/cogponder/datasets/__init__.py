@@ -6,7 +6,6 @@ from .data_module import CogPonderDataModule
 __all__ = [
     'NBackMockDataset',
     'NBackSRODataset',
-    'NBackDataModule',
     'StroopSRODataset',
     'CogPonderDataModule'
 ]
