@@ -132,3 +132,6 @@ dmypy.json
 runs/**/events.out.tfevents*
 lightning_logs/
 .conda/
+
+*.drawio.bkp
+*.drawio.dtmp
