@@ -50,6 +50,7 @@ class CogPonderModel(LightningModule):
         self.embeddings_dim = embeddings_dim
         self.max_response_step = max_response_step
         self.n_contexts = n_contexts
+        self.context_embeddings_dim = context_embeddings_dim
         self.response_loss_beta = response_loss_beta
         self.time_loss_beta = time_loss_beta
         self.learning_rate = learning_rate
@@ -65,7 +66,8 @@ class CogPonderModel(LightningModule):
         # init nodes
         self.operator_node = SimpleOperatorModule(self.embeddings_dim, self.outputs_dim)
         self.halt_node = HaltingModule(self.embeddings_dim, self.max_response_step)
-        self.recurrence_node = RecurrenceModule(self.inputs_dim, self.embeddings_dim)
+        self.recurrence_node = RecurrenceModule(self.inputs_dim + self.context_embeddings_dim,
+                                                self.embeddings_dim)
 
         # init contextual embeddings (e.g., subject)
         self.context_embeddings = nn.Embedding(self.n_contexts, self.context_embeddings_dim)
@@ -169,8 +171,6 @@ class CogPonderModel(LightningModule):
         # forward pass
         y_steps, p_halts, rt_pred = self.forward(stimuli, contexts)
         y_pred = torch.argmax(y_steps, dim=-1).gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
-
-        print(y_steps.shape, p_halts.shape, rt_pred.shape)
 
         # compute losses
         resp_loss = self.resp_loss_fn(p_halts, y_steps, responses)
