@@ -2,7 +2,7 @@ from collections import namedtuple
 import torch
 import pandas as pd
 from typing import Union
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, TensorDataset
 import numpy as np
 from .utils import remove_non_decision_time
 
@@ -42,13 +42,13 @@ class StroopSRODataset(Dataset):
     def __len__(self):
         """Get the total number of observations (i.e., trials).
         """
-        return self._data[0].shape[0]
+        return self._data.__len__()
 
     def __getitem__(self, idx):
         """Get a feature vector and it's target label.
         """
 
-        items = (torch.tensor(v[idx]) for k, v in self._data.items())
+        items = self._data[idx]
 
         return items
 
@@ -109,13 +109,10 @@ class StroopSRODataset(Dataset):
         #     'corrects': ('observation')
         # }
 
-        SRODataset = namedtuple('SRODataset', mappings.keys())
-        preprocessed_data = {}
+        preprocessed = (torch.Tensor(data[v].values.squeeze()) for v in mappings.values())
 
-        for k, v in mappings.items():
-            preprocessed_data[k] = data[v].values.squeeze()
+        return TensorDataset(*preprocessed, names=mappings.keys())
 
-        return preprocessed_data
 
         # TODO REWRITE and REMOVE
         # automatically calculate non-decision time (min RT - 1-step)
