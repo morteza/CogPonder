@@ -1,9 +1,9 @@
+from collections import namedtuple
 import torch
 import pandas as pd
 from typing import Union
 from torch.utils.data import Dataset
 import numpy as np
-import xarray as xr
 from .utils import remove_non_decision_time
 
 
@@ -42,16 +42,15 @@ class StroopSRODataset(Dataset):
     def __len__(self):
         """Get the total number of observations (i.e., trials).
         """
-        return self._data.dims['observation']
+        return self._data[0].shape[0]
 
     def __getitem__(self, idx):
         """Get a feature vector and it's target label.
         """
 
-        subset = self._data.isel(observation=idx)
-        items = [torch.tensor(subset[v].values) for v in subset.data_vars]
+        items = (torch.tensor(v[idx]) for k, v in self._data.items())
 
-        return tuple(items)
+        return items
 
     def preprocess(self):
 
@@ -100,20 +99,21 @@ class StroopSRODataset(Dataset):
             'corrects': ['correct'],
         }
 
-        dimensions = {
-            'trial_ids': ('observation'),
-            'subject_ids': ('observation'),
-            'contexts': ('observation'),
-            'stimuli': ('observation', 'stimulus_modality'),
-            'responses': ('observation'),
-            'response_steps': ('observation'),
-            'corrects': ('observation')
-        }
+        # dimensions = {
+        #     'trial_ids': ('observation'),
+        #     'subject_ids': ('observation'),
+        #     'contexts': ('observation'),
+        #     'stimuli': ('observation', 'stimulus_modality'),
+        #     'responses': ('observation'),
+        #     'response_steps': ('observation'),
+        #     'corrects': ('observation')
+        # }
 
-        preprocessed_data = xr.Dataset()
+        SRODataset = namedtuple('SRODataset', mappings.keys())
+        preprocessed_data = {}
 
         for k, v in mappings.items():
-            preprocessed_data[k] = (dimensions[k], data[v].values.squeeze())
+            preprocessed_data[k] = data[v].values.squeeze()
 
         return preprocessed_data
 
