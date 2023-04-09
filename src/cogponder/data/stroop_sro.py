@@ -95,23 +95,16 @@ class StroopSRODataset(Dataset):
             'contexts': ['condition'],
             'stimuli': ['stim_color', 'stim_word'],
             'responses': ['key_press'],
-            'response_steps': ['response_step'],  # requires post-processing to be in steps
+            'response_steps': ['response_step'],
             'corrects': ['correct'],
         }
 
-        # dimensions = {
-        #     'trial_ids': ('observation'),
-        #     'subject_ids': ('observation'),
-        #     'contexts': ('observation'),
-        #     'stimuli': ('observation', 'stimulus_modality'),
-        #     'responses': ('observation'),
-        #     'response_steps': ('observation'),
-        #     'corrects': ('observation')
-        # }
-
         preprocessed = (torch.Tensor(data[v].values.squeeze()) for v in mappings.values())
 
-        return TensorDataset(*preprocessed, names=mappings.keys())
+        # for p in preprocessed:
+        #     print(p.dtype, p.shape)
+
+        return TensorDataset(*preprocessed)
 
 
         # TODO REWRITE and REMOVE

@@ -92,10 +92,12 @@ class CogPonderModel(LightningModule):
             (y_steps, p_steps, halt_steps)
         """
 
+        context_ids = context_ids.int()
         batch_size = x.size(0)
 
         # append subject-specific embeddings to the input
         if self.n_subjects is not None:
+            subject_ids = subject_ids.int()
             subject_features = self.subject_embeddings(subject_ids)
             x = torch.cat([x, subject_features], dim=1)
 
@@ -148,16 +150,16 @@ class CogPonderModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        _, subject_ids, contexts, stimuli, responses, rt_true, _ = batch
+        _, subject_ids, contexts, stimuli, y_true, rt_true, _ = batch
 
         # forward pass
         y_steps, y_pred, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
 
         # compute losses
-        resp_loss = self.resp_loss_fn(p_halts, y_steps, responses)
+        resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true.long())
         time_loss = self.time_loss_fn(p_halts, rt_true)
         loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss
-        accuracy = (y_pred.int() == responses.int()).float().mean()
+        accuracy = (y_pred.int() == y_true.int()).float().mean()
 
         # log losses
         self.log('train/resp_loss', resp_loss)
@@ -176,16 +178,16 @@ class CogPonderModel(LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        _, subject_ids, contexts, stimuli, responses, rt_true, _ = batch
+        _, subject_ids, contexts, stimuli, y_true, rt_true, _ = batch
 
         # forward pass
         y_steps, y_pred, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
 
         # compute losses
-        resp_loss = self.resp_loss_fn(p_halts, y_steps, responses)
+        resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true.long())
         time_loss = self.time_loss_fn(p_halts, rt_true)
         loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss
-        accuracy = (y_pred.int() == responses.int()).float().mean()
+        accuracy = (y_pred.int() == y_true.int()).float().mean()
 
         # log losses
         self.log('val/resp_loss', resp_loss)
