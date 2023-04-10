@@ -37,7 +37,7 @@ class StroopSRODataset(Dataset):
         self.non_decision_time = non_decision_time
         self.data_path = data_path
 
-        self._data = self.preprocess()
+        self._data = self.to_tensor_dataset(self.preprocess())
 
     def __len__(self):
         """Get the total number of observations (i.e., trials).
@@ -72,10 +72,14 @@ class StroopSRODataset(Dataset):
 
         # set categories
         data['worker_id'] = data['worker_id'].astype('category')
-        data['condition'] = data['condition'].astype('category').cat.set_categories(sro_conditions.keys(), ordered=True)
-        data['key_press'] = data['key_press'].astype('category').cat.set_categories(sro_colors.values(), ordered=True)
-        data['stim_color'] = data['stim_color'].astype('category').cat.set_categories(sro_colors.values(), ordered=True)
-        data['stim_word'] = data['stim_word'].astype('category').cat.set_categories(sro_colors.values(), ordered=True)
+        data['condition'] = data['condition'].astype('category').cat.set_categories(
+            list(sro_conditions.keys()), ordered=True)
+        data['key_press'] = data['key_press'].astype('category').cat.set_categories(
+            list(sro_colors.values()), ordered=True)
+        data['stim_color'] = data['stim_color'].astype('category').cat.set_categories(
+            list(sro_colors.values()), ordered=True)
+        data['stim_word'] = data['stim_word'].astype('category').cat.set_categories(
+            list(sro_colors.values()), ordered=True)
 
         # encode categorical variables
         data['worker_id'] = data['worker_id'].cat.codes.astype('int')   # start at 0
@@ -99,13 +103,17 @@ class StroopSRODataset(Dataset):
             'corrects': ['correct'],
         }
 
-        preprocessed = (torch.Tensor(data[v].values.squeeze()) for v in mappings.values())
+        preprocessed = (data[v] for v in mappings.values())
 
-        # for p in preprocessed:
-        #     print(p.dtype, p.shape)
+        return preprocessed
 
-        return TensorDataset(*preprocessed)
+    def to_tensor_dataset(self, preprocessed):
+        """Helper to convert a preprocessed data mapping to a TensorDataset.
+        """
 
+        tensors = (torch.Tensor(df.values.squeeze()) for df in preprocessed)
+
+        return TensorDataset(*tensors)
 
         # TODO REWRITE and REMOVE
         # automatically calculate non-decision time (min RT - 1-step)

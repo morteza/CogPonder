@@ -17,7 +17,6 @@ class CogPonderDataModule(pl.LightningDataModule):
         super().__init__()
         self.save_hyperparameters(ignore=['dataset'], logger=False)
 
-        # wrap dataset with tensor dataset
         self.dataset = TensorDataset(*dataset[:])
 
         self.train_ratio = train_ratio
@@ -26,15 +25,12 @@ class CogPonderDataModule(pl.LightningDataModule):
         self.num_workers = num_workers
 
     def prepare_data(self):
+        n_trials = torch.unique(self.dataset[:][0]).shape[0]
+        train_idx = torch.where(self.dataset[:][0] <= n_trials * self.train_ratio)[0]
+        test_idx = torch.where(self.dataset[:][0] > n_trials * self.train_ratio)[0]        
 
-        train_size = int(len(self.dataset) * self.train_ratio)
-        test_size = len(self.dataset) - train_size
-
-        if self.randomized_split:
-            self.train_dataset, self.test_dataset = random_split(self.dataset, lengths=(train_size, test_size))
-        else:
-            self.train_dataset = Subset(self.dataset, torch.arange(0, train_size).tolist())
-            self.test_dataset = Subset(self.dataset, torch.arange(train_size, len(self.dataset)).tolist())
+        self.train_dataset = Subset(self.dataset, train_idx.tolist())
+        self.test_dataset = Subset(self.dataset, test_idx.tolist())
 
     def _dataloader(self, dataset):
         dataloader = DataLoader(
