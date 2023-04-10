@@ -1,8 +1,10 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 from pytorch_lightning import LightningModule
 from ..losses import ResponseLoss, ResponseTimeLoss
-# import torchmetrics
+import torchmetrics.functional as metrics
+
 
 from .halting import HaltingModule
 from .operator import SimpleOperatorModule
@@ -164,13 +166,21 @@ class CogPonderModel(LightningModule):
         resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true.long())
         time_loss = self.time_loss_fn(p_halts, rt_true)
         loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss
-        accuracy = (y_pred.int() == y_true.int()).float().mean()
+        accuracy = metrics.accuracy(y_pred.int(), y_true.int(),
+                                    task='multiclass',
+                                    num_classes=self.outputs_dim)
+        rt_corr = metrics.pearson_corrcoef(rt_pred.float(), rt_true.float())
+        rt_r2 = metrics.r2_score(rt_pred.float(), rt_true.float())
+        # accuracy = (y_pred.int() == y_true.int()).float().mean()
+        # rt_error = F.mse_loss(rt_pred.float(), rt_true.float()).sqrt()
 
         # log losses
         self.log('train/resp_loss', resp_loss)
         self.log('train/time_loss', time_loss)
         self.log('train/total_loss', loss)
         self.log('train/accuracy', accuracy)
+        self.log('train/rt_correlation', rt_corr)
+        self.log('train/rt_r2', rt_r2)
 
         # compute and log accuracy (assuming binary classification)
         # y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
@@ -192,13 +202,21 @@ class CogPonderModel(LightningModule):
         resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true.long())
         time_loss = self.time_loss_fn(p_halts, rt_true)
         loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss
-        accuracy = (y_pred.int() == y_true.int()).float().mean()
+        accuracy = metrics.accuracy(y_pred.int(), y_true.int(),
+                                    task='multiclass',
+                                    num_classes=self.outputs_dim)
+        rt_corr = metrics.pearson_corrcoef(rt_pred.float(), rt_true.float())
+        rt_r2 = metrics.r2_score(rt_pred.float(), rt_true.float())
+        # accuracy = (y_pred.int() == y_true.int()).float().mean()
+        # rt_error = F.mse_loss(rt_pred.float(), rt_true.float()).sqrt()
 
         # log losses
         self.log('val/resp_loss', resp_loss)
         self.log('val/time_loss', time_loss)
         self.log('val/total_loss', loss)
         self.log('val/accuracy', accuracy)
+        self.log('val/rt_correlation', rt_corr)
+        self.log('val/rt_r2', rt_r2)
 
         # match self.task:
         #     case 'nback':
