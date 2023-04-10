@@ -62,8 +62,12 @@ class CogPonderModel(LightningModule):
         # self.val_accuracy = torchmetrics.Accuracy(task='multiclass')
 
         # init nodes
-        self.operator_node = SimpleOperatorModule(self.embeddings_dim, self.outputs_dim)
-        self.halt_node = HaltingModule(self.embeddings_dim, self.max_response_step)
+        # self.operator_input_fc = nn.Linear(self.inputs_dim + self.subject_embeddings_dim,
+        #                                    self.embeddings_dim)
+        self.operator_node = SimpleOperatorModule(self.embeddings_dim,
+                                                  self.outputs_dim)
+        self.halt_node = HaltingModule(self.embeddings_dim,
+                                       self.max_response_step)
         self.recurrence_node = RecurrenceModule(self.inputs_dim + self.subject_embeddings_dim,
                                                 self.embeddings_dim)
 
@@ -72,7 +76,9 @@ class CogPonderModel(LightningModule):
             self.subject_embeddings = nn.Embedding(self.n_subjects, self.subject_embeddings_dim, dtype=torch.float)
 
         # init embeddings
-        self.embeddings = nn.Embedding(self.n_contexts, self.embeddings_dim, dtype=torch.float)
+        self.embeddings = nn.Embedding(self.n_contexts,
+                                       self.embeddings_dim,
+                                       dtype=torch.float)
 
         # init losses
         self.resp_loss_fn = ResponseLoss()
@@ -95,11 +101,9 @@ class CogPonderModel(LightningModule):
         context_ids = context_ids.int()
         batch_size = x.size(0)
 
-        # append subject-specific embeddings to the input
-        if self.n_subjects is not None:
-            subject_ids = subject_ids.int()
-            subject_features = self.subject_embeddings(subject_ids)
-            x = torch.cat([x, subject_features], dim=1)
+        # append subject-specific embeddings
+        subject_features = self.subject_embeddings(subject_ids.int())
+        x = torch.cat([x, subject_features], dim=1)
 
         # init parameters
         h = self.embeddings(context_ids)
@@ -117,6 +121,7 @@ class CogPonderModel(LightningModule):
             y_list.append(y_step)
 
             # 2. calculate halting probability
+
             lambda_n = self.halt_node(h, n)
             p_list.append(p_continue * lambda_n)
             p_continue = p_continue * (1 - lambda_n)
