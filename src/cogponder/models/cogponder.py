@@ -124,7 +124,8 @@ class CogPonderModel(LightningModule):
 
             # 2. calculate halting probability
 
-            lambda_n = self.halt_node(h, n)
+            lambda_n = self.halt_node(h, n).to(self.device)
+
             p_list.append(p_continue * lambda_n)
             p_continue = p_continue * (1 - lambda_n)
             halt_steps = torch.max(
