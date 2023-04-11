@@ -29,9 +29,8 @@ class CogPonderDataModule(pl.LightningDataModule):
 
         # remove invalid trials
         rts = self.dataset[:][5]
-        invalid_trials = (rts < 0) | (rts > 200)
-        # invalid_trials = (self.dataset[:][4] < 0)
-        self.dataset = TensorDataset(*self.dataset[~invalid_trials])
+        valid_trials = (rts > 0)
+        self.dataset = TensorDataset(*self.dataset[valid_trials])
 
         # test/train split
         n_trials = torch.unique(self.dataset[:][0]).shape[0]

@@ -53,7 +53,8 @@ class NBackSRODataset(Dataset):
 
         data = data.query('worker_id in @worker_ids and '
                           'exp_stage == "adaptive" and '
-                          'load == @n_back and target.notna()').copy()
+                          'load == @n_back and target.notna() and '
+                          'rt > 0 and rt < 2000').copy()
 
         data.sort_index(inplace=True)
 
@@ -88,8 +89,6 @@ class NBackSRODataset(Dataset):
             'response_steps': ['response_step'],
             'corrects': ['correct']
         }
-
-        self.df = data
 
         preprocessed = (data[v] for v in mappings.values())
 
