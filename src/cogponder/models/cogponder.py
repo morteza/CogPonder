@@ -70,12 +70,10 @@ class CogPonderModel(LightningModule):
                                                   self.outputs_dim)
         self.halt_node = HaltingModule(self.embeddings_dim,
                                        self.max_response_step)
-        self.recurrence_node = RecurrenceModule(self.inputs_dim + self.subject_embeddings_dim,
-                                                self.embeddings_dim)
-
-        # init subject embeddings (if applicable)
-        if self.n_subjects is not None:
-            self.subject_embeddings = nn.Embedding(self.n_subjects, self.subject_embeddings_dim, dtype=torch.float)
+        self.recurrence_node = RecurrenceModule(self.inputs_dim,
+                                                self.embeddings_dim,
+                                                self.n_subjects,
+                                                self.subject_embeddings_dim)
 
         # init embeddings
         self.embeddings = nn.Embedding(self.n_contexts,
@@ -102,10 +100,6 @@ class CogPonderModel(LightningModule):
 
         context_ids = context_ids.int()
         batch_size = x.size(0)
-
-        # append subject-specific embeddings
-        subject_features = self.subject_embeddings(subject_ids.int())
-        x = torch.cat([x, subject_features], dim=1)
 
         # init parameters
         h = self.embeddings(context_ids)
@@ -134,7 +128,7 @@ class CogPonderModel(LightningModule):
             )
 
             # 3. loop
-            h = self.recurrence_node(x, h)
+            h = self.recurrence_node(x, h, subject_ids)
 
             # 4. stop if all the samples have halted
             # IGNORE: enable for debugging or stopping the recurrent loop upon halt.
