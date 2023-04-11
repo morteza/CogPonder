@@ -160,6 +160,9 @@ class CogPonderModel(LightningModule):
 
         _, subject_ids, contexts, stimuli, y_true, rt_true, _ = batch
 
+        # FIXME this is a hack to disable contextual embedding
+        contexts = torch.zeros_like(contexts)
+
         # forward pass
         y_steps, y_pred, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
 
@@ -195,6 +198,9 @@ class CogPonderModel(LightningModule):
     def validation_step(self, batch, batch_idx):
 
         _, subject_ids, contexts, stimuli, y_true, rt_true, _ = batch
+
+        # FIXME this is a hack to disable contextual embedding
+        contexts = torch.zeros_like(contexts)
 
         # forward pass
         y_steps, y_pred, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
