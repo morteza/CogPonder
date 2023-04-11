@@ -1,6 +1,6 @@
 import torch
 import pandas as pd
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, TensorDataset
 from typing import Union
 import numpy as np
 from .utils import remove_non_decision_time
@@ -9,119 +9,97 @@ from .utils import remove_non_decision_time
 class NBackSRODataset(Dataset):
     """Self-regulation ontology adaptive N-back dataset -- a binary classification task.
 
+    Args:
+        n_subjects (int): Number of subjects.
+        n_back (int): Number of items in the N-back sequence. Defaults to 2.
+        non_decision_time (str or int): Non-decision time in milliseconds. Defaults to 'auto'.
     """
 
     def __init__(
         self,
-        n_subjects,
+        n_subjects: int = -1,  # -1 means all
         n_back=2,
         response_step_interval=10,
         non_decision_time: Union[str, int] = 'auto',
-        data_file='data/Self_Regulation_Ontology/adaptive_n_back.csv.gz'
+        data_path='data/Self_Regulation_Ontology/adaptive_n_back.csv.gz'
     ):
 
-        """Initialize the dataset.
-
-        Args:
-            n_subjects (int): Number of subjects.
-            n_back (int): Number of items in the N-back sequence. Defaults to 2.
-            non_decision_time (str or int): Non-decision time in milliseconds. Defaults to 'auto'.
-        """
         self.n_subjects = n_subjects
         self.n_back = n_back
         self.response_step_interval = response_step_interval
         self.non_decision_time = non_decision_time
-        self.data_file = data_file
+        self.data_path = data_path
 
-        # load and cleanup the data
-        self._data = self.prepare_data(self.n_subjects, self.n_back)
+        self._data = self.to_tensor_dataset(self.preprocess(n_back=self.n_back))
 
     def __len__(self):
         """Get the number of samples.
         """
-        return self.n_subjects
+        return self._data.__len__()
 
     def __getitem__(self, idx):
         """Get a feature vector and it's target label.
         """
 
-        _item = []
+        items = self._data[idx]
 
-        for x in self._data:
-            _item.append(x[idx])
+        return items
 
-        return tuple(_item)
+    def preprocess(self, n_back):
 
-    def prepare_data(self, n_subjects, n_back, **kwargs):
-        """[summary]
+        data = pd.read_csv(self.data_path, index_col=0)
 
-        Args:
-            n_subjects (int): number of subjects to load. -1 for all subjects.
-            n_back (int): number of items in the N-back sequence
-            worker_ids (list[str], optional): list of SRO worker ids to load. Defaults to None.
+        worker_ids = data['worker_id'].unique()[:self.n_subjects]  # noqa
 
-        Returns:
-            subject_ids:
-                subject index.
-            stimulus:
-                stimulus features. In N-back, this is the letter presented.
-            trial_types:
-                Whether current stimulus was a match or not: 0 is non-match, and 1 is a match.
-            responses:
-                whether current stimulus was detected as a match or not.
-            response_steps:
-                response time (refined to steps).
-            corrects:
-                whether recorded response was correct or not.
-        """
-
-        data = pd.read_csv(
-            self.data_file,
-            index_col=0,
-            dtype={
-                'worker_id': 'str',
-                'stim_color': 'category',
-                'stim_word': 'category',
-                'condition': 'category'})
-
-        # figure out worker_ids to load
-        worker_ids = kwargs.get('worker_ids', [])
-
-        if len(worker_ids) == 0:
-            worker_ids = data['worker_id'].unique()[:n_subjects]
-
-        # filter out worker_ids and practice trials
         data = data.query('worker_id in @worker_ids and '
                           'exp_stage == "adaptive" and '
-                          # 'block_num == 0.0 and '
-                          'load == @n_back').copy()
+                          'load == @n_back and target.notna()').copy()
 
-        data = data.sort_values(['worker_id', 'block_num', 'trial_num'])
-        data['matched'] = data['stim'].str.upper() == data['target'].str.upper()  # match or not
+        data.sort_index(inplace=True)
 
-        # automatically calculate non-decision time (min RT - 1-step)
-        if self.non_decision_time == 'auto':
-            data['rt'] = data.groupby(['worker_id'])['rt'].transform(remove_non_decision_time,
-                                                                     response_step_interval=self.response_step_interval)
-        data['response_step'] = (data['rt'] / self.response_step_interval).apply(np.round)
+        sro_keys = {37: 'match', 40: 'non-match'}
 
-        # discard trials with invalid targets, e.g., burn-in trials
-        data = data.query('target.notna() and rt>=0').copy()
+        # mapping
+        data['trial_index'] = data.groupby('worker_id').cumcount()
+        data['is_match'] = data['stim'].str.upper() == data['target'].str.upper()  # match or not
+        data['key_press'] = data['key_press'].map(sro_keys)
+        data['response_step'] = data['rt'] // self.response_step_interval
+        data['response_step'] = data['response_step'].apply(np.floor).astype('int')
 
-        # to numpy
-        worker_ids = data['worker_id'].astype('category').cat.codes.values
-        stimuli = data['stim'].str.upper().astype('category').cat.codes.values
-        trial_types = data['matched'].values
-        responses = data['key_press'].astype('category').cat.codes.values
-        response_steps = data['response_step'].values
-        corrects = data['correct'].values
+        # set categories
+        data['worker_id'] = data['worker_id'].astype('category')
+        data['key_press'] = data['key_press'].astype('category').cat.set_categories(
+            list(sro_keys.values()), ordered=True)
+        data['stim'] = data['stim'].str.upper().astype('category')
 
-        # to tensors
-        worker_ids = torch.tensor(worker_ids, dtype=torch.long).reshape(-1,)
-        stimuli = torch.tensor(stimuli, dtype=torch.float).reshape(-1, 1)
-        trial_types = torch.tensor(trial_types, dtype=torch.long).reshape(-1,)
-        responses = torch.tensor(responses, dtype=torch.long).reshape(-1,)
-        response_steps = torch.tensor(response_steps, dtype=torch.long).reshape(-1,)
-        corrects = torch.tensor(corrects, dtype=torch.bool).reshape(-1,)
+        # encode categorical variables
+        data['worker_id'] = data['worker_id'].cat.codes.astype('int')   # start at 0
+        data['is_match'] = data['is_match'].astype('int')   # start at 0
+        data['key_press'] = data['key_press'].cat.codes.astype('int')
+        data['stim'] = data['stim'].cat.codes.astype('float32')
+        data['correct'] = data['correct'].astype('int')
 
-        return (worker_ids, stimuli, trial_types, responses, response_steps, corrects)
+        mappings = {
+            'trial_ids': ['trial_index'],
+            'subject_ids': ['worker_id'],
+            'contexts': ['is_match'],
+            'stimuli': ['stim'],
+            'responses': ['key_press'],
+            'response_steps': ['response_step'],
+            'corrects': ['correct']
+        }
+
+        self.df = data
+
+        preprocessed = (data[v] for v in mappings.values())
+
+        return preprocessed
+
+    def to_tensor_dataset(self, preprocessed):
+        """Helper to convert a preprocessed data mapping to a TensorDataset.
+        """
+
+        tensors = [torch.Tensor(df.values.squeeze()) for df in preprocessed]
+        tensors[3] = tensors[3].reshape(-1, 1)  # reshape stimuli (1 column)
+
+        return TensorDataset(*tensors)
