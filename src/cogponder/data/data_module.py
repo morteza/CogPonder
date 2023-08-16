@@ -12,7 +12,7 @@ class CogPonderDataModule(pl.LightningDataModule):
         dataset: Dataset,
         train_ratio=.75,
         batch_size=4,
-        randomized_split=False,
+        shuffle=False,
         num_workers: int = -1
     ):
         super().__init__()
@@ -22,7 +22,7 @@ class CogPonderDataModule(pl.LightningDataModule):
 
         self.train_ratio = train_ratio
         self.batch_size = batch_size
-        self.randomized_split = randomized_split
+        self.shuffle = shuffle
         self.num_workers = num_workers
 
     def prepare_data(self):
@@ -44,7 +44,7 @@ class CogPonderDataModule(pl.LightningDataModule):
         dataloader = DataLoader(
             dataset,
             batch_size=self.batch_size,
-            shuffle=self.randomized_split,
+            shuffle=self.shuffle,
             num_workers=self.num_workers)
 
         return dataloader

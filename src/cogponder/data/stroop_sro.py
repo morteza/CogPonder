@@ -27,13 +27,13 @@ class StroopSRODataset(Dataset):
     def __init__(
         self,
         n_subjects: int = -1,  # -1 means all
-        response_step_interval=10,
+        step_duration=10,
         non_decision_time: Union[str, int] = 'auto',
         data_path='data/Self_Regulation_Ontology/stroop.csv.gz'
     ):
 
         self.n_subjects = n_subjects
-        self.response_step_interval = response_step_interval
+        self.step_duration = step_duration
         self.non_decision_time = non_decision_time
         self.data_path = data_path
 
@@ -90,7 +90,7 @@ class StroopSRODataset(Dataset):
         data['correct'] = data['correct'].astype('int')
 
         # compute response steps
-        data['response_step'] = data['rt'] // self.response_step_interval
+        data['response_step'] = data['rt'] // self.step_duration
         data['response_step'] = data['response_step'].apply(np.floor).astype('int')
 
         mappings = {
