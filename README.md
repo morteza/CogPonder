@@ -12,9 +12,16 @@ To install the dependencies, you need [Conda](https://conda.io/projects/conda/en
 
 
 ```bash
-mamba create -f env.yml
+mamba env create -f environment.yml
 mamba activate cogponder
 dvc update --rev master -R data  # import the SRO data using DVC
+```
+
+To create an environment including additional GPU dependencies use the following command instead:
+
+```bash
+mamba env create -f environment.yml -f environment_gpu.yml
+mamba activate cogponder
 ```
 
 ## Notebooks
