@@ -1,5 +1,5 @@
 # Note: This file is used to add additional dependencies for a GPU environment.
-# Usage: mamba create -f environment.yml -f environment_gpu.yml
+# Usage: mamba env create -f environment.yml -f environment_gpu.yml
 
 name: cogponder
 
