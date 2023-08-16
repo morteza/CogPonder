@@ -3,22 +3,27 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset, Subset
 from torch.utils.data import Dataset
 import numpy as np
+from typing import Dict
 
 
 class CogPonderDataModule(pl.LightningDataModule):
 
     def __init__(
         self,
-        dataset: Dataset,
+        datasets: TensorDataset | Dict[str, Dataset],
         train_ratio=.75,
         batch_size=4,
         shuffle=False,
         num_workers: int = -1
     ):
         super().__init__()
-        self.save_hyperparameters(ignore=['dataset'], logger=False)
+        self.save_hyperparameters(ignore=['datasets'], logger=False)
 
-        self.dataset = dataset
+        if isinstance(datasets, TensorDataset):
+            self.dataset = datasets
+        elif isinstance(datasets, dict):
+            # TODO support multitask
+            pass
 
         self.train_ratio = train_ratio
         self.batch_size = batch_size
@@ -27,18 +32,21 @@ class CogPonderDataModule(pl.LightningDataModule):
 
     def prepare_data(self):
 
-        # remove invalid trials
-        rts = self.dataset[:][5]
-        valid_trials = (rts > 0)
+        response_steps = self.dataset[:][5]
+
+        # remove invalid trials (rt <= 0)
+        valid_trials = (response_steps > 0)
         self.dataset = TensorDataset(*self.dataset[valid_trials])
 
-        # test/train split
-        n_trials = torch.unique(self.dataset[:][0]).shape[0]
-        train_idx = torch.where(self.dataset[:][0] <= n_trials * self.train_ratio)[0]
-        test_idx = torch.where(self.dataset[:][0] > n_trials * self.train_ratio)[0]
+        trial_ids = self.dataset[:][0]
+        n_trials = torch.unique(trial_ids).shape[0]
 
-        self.train_dataset = Subset(self.dataset, train_idx.tolist())
-        self.test_dataset = Subset(self.dataset, test_idx.tolist())
+        # test/train split (FIXME: should it pick the first n trials, not trial 1..n)
+        train_ids = torch.where(trial_ids <= n_trials * self.train_ratio)[0].tolist()
+        test_ids = torch.where(trial_ids > n_trials * self.train_ratio)[0].tolist()
+
+        self.train_dataset = Subset(self.dataset, train_ids)
+        self.test_dataset = Subset(self.dataset, test_ids)
 
     def _dataloader(self, dataset):
         dataloader = DataLoader(
