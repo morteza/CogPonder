@@ -113,6 +113,7 @@ class CogPonderModel(LightningModule):
         for n in range(1, self.max_response_step + 1):
 
             # 1. operate
+
             y_step = self.operator_node(h)
             y_list.append(y_step)
 
@@ -141,14 +142,14 @@ class CogPonderModel(LightningModule):
 
         # normalize halting probabilities (sums to 1 across steps)
         for i in range(batch_size):
-            halt_step = halt_steps[i] - 1
+            halt_step = halt_steps[i] - 1  # FIXME
             p_steps[halt_step:, i] = 0.0
             p_steps[halt_step, i] = 1 - p_steps[:halt_step, i].sum()
 
         # gather response at halting time
         y_pred = torch.argmax(y_steps, dim=-1).gather(dim=0, index=halt_steps[None, :] - 1,)[0]
 
-        return y_steps, y_pred, p_steps, halt_steps
+        return y_pred, y_steps, p_steps, halt_steps
 
     def training_step(self, batch, batch_idx):
 
@@ -158,7 +159,7 @@ class CogPonderModel(LightningModule):
         contexts = torch.zeros_like(contexts)
 
         # forward pass
-        y_steps, y_pred, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
+        y_pred, y_steps, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
 
         # compute losses
         resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true.long())
@@ -197,7 +198,7 @@ class CogPonderModel(LightningModule):
         contexts = torch.zeros_like(contexts)
 
         # forward pass
-        y_steps, y_pred, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
+        y_pred, y_steps, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
 
         # compute losses
         resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true.long())

@@ -12,6 +12,7 @@ class NBackSRODataset(Dataset):
     Args:
         n_subjects (int): Number of subjects.
         n_back (int): Number of items in the N-back sequence. Defaults to 2.
+        step_duration (int): Duration of each step in milliseconds. Defaults to 10.
         non_decision_time (str or int): Non-decision time in milliseconds. Defaults to 'auto'.
     """
 
@@ -19,14 +20,14 @@ class NBackSRODataset(Dataset):
         self,
         n_subjects: int = -1,  # -1 means all
         n_back=2,
-        response_step_interval=10,
+        step_duration=10,
         non_decision_time: Union[str, int] = 'auto',
         data_path='data/Self_Regulation_Ontology/adaptive_n_back.csv.gz'
     ):
 
         self.n_subjects = n_subjects
         self.n_back = n_back
-        self.response_step_interval = response_step_interval
+        self.step_duration = step_duration
         self.non_decision_time = non_decision_time
         self.data_path = data_path
 
@@ -64,7 +65,7 @@ class NBackSRODataset(Dataset):
         data['trial_index'] = data.groupby('worker_id').cumcount()
         data['is_match'] = data['stim'].str.upper() == data['target'].str.upper()  # match or not
         data['key_press'] = data['key_press'].map(sro_keys)
-        data['response_step'] = data['rt'] // self.response_step_interval
+        data['response_step'] = data['rt'] // self.step_duration
         data['response_step'] = data['response_step'].apply(np.floor).astype('int')
 
         # set categories
@@ -80,6 +81,7 @@ class NBackSRODataset(Dataset):
         data['stim'] = data['stim'].cat.codes.astype('float32')
         data['correct'] = data['correct'].astype('int')
 
+        # column names mapping
         mappings = {
             'trial_ids': ['trial_index'],
             'subject_ids': ['worker_id'],
