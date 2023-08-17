@@ -14,7 +14,9 @@ class RecurrenceModule(nn.Module):
         if self.n_subjects is not None:
             self.subject_embeddings = nn.Embedding(self.n_subjects, self.subject_embeddings_dim, dtype=torch.float)
 
-        self.model = nn.GRUCell(self.inputs_dim + self.subject_embeddings_dim, self.embeddings_dim)
+        self.model = nn.GRU(self.inputs_dim + self.subject_embeddings_dim,
+                            self.embeddings_dim,
+                            batch_first=True)
 
     def forward(self, x, h, subject_ids):
         """Forward pass of the recurrence module
@@ -31,10 +33,15 @@ class RecurrenceModule(nn.Module):
         Tensor
             next contextual information of shape (batch_size, embeddings_dim)
         """
+
+        batch_size, n_timepoints, n_features = x.shape
+
         # append subject-specific embeddings
         subject_features = self.subject_embeddings(subject_ids.int())
-        x = torch.cat([x, subject_features], dim=1)
+        subject_features = subject_features.unsqueeze(1).repeat(1, n_timepoints, 1)
+        x = torch.cat([x, subject_features], dim=-1)
 
-        out = self.model(x, h)
+        out, _ = self.model(x, h.unsqueeze(0))
+        out = out[:, -1, :]
 
         return out

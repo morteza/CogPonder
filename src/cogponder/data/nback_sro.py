@@ -17,6 +17,17 @@ class NBackSRODataset(Dataset):
         non_decision_time (str or int): Non-decision time in milliseconds. Defaults to 'auto'.
     """
 
+    # feature names mapping from the original dataset (value) to the tensor dataset (key)
+    mappings = {
+        'subject_ids': ['worker_id'],
+        'trial_ids': ['trial_index'],
+        'contexts': ['is_match'],
+        'stimuli': ['stim'],
+        'responses': ['key_press'],
+        'response_steps': ['response_step'],
+        'corrects': ['correct']
+    }
+
     def __init__(
         self,
         n_subjects: int = -1,  # -1 means all
@@ -82,18 +93,7 @@ class NBackSRODataset(Dataset):
         data['stim'] = data['stim'].cat.codes.astype('float32') + 1  # start at 1, 0 is reserved for burn-in padding
         data['correct'] = data['correct'].astype('int')
 
-        # column names mapping
-        mappings = {
-            'subject_ids': ['worker_id'],
-            'trial_ids': ['trial_index'],
-            'contexts': ['is_match'],
-            'stimuli': ['stim'],
-            'responses': ['key_press'],
-            'response_steps': ['response_step'],
-            'corrects': ['correct']
-        }
-
-        preprocessed = {k: data[v].values.squeeze() for k, v in mappings.items()}
+        preprocessed = {k: data[v].values.squeeze() for k, v in self.mappings.items()}
 
         # sliding window stimuli
         stim = data.groupby(['worker_id', 'block_num'])['stim'].apply(
@@ -101,6 +101,8 @@ class NBackSRODataset(Dataset):
                 np.pad(x, (self.n_back, 0), 'constant', constant_values=0),
                 n_back + 1).tolist(),
         ).to_list()
+
+        # reshape stimuli to (trials, seq, feature)
         stim = np.concatenate(stim).reshape(-1, self.n_back + 1, 1)
         preprocessed['stimuli'] = stim  # type: ignore
 

@@ -7,7 +7,7 @@ import torchmetrics.functional as metrics
 
 
 from .halting import HaltingModule
-from .operator import SimpleOperatorModule
+from .operator import SimpleOperatorModule, SpatioTemporalOperatorModule
 from .recurrence import RecurrenceModule
 
 
@@ -25,6 +25,7 @@ class CogPonderModel(LightningModule):
         response_loss_beta=1.,
         time_loss_beta=1.,
         learning_rate=1e-3,
+        operator_type='simple',
         example_input_array=None
     ):
         """CogPonder model written in PyTorch Lightning.
@@ -66,14 +67,21 @@ class CogPonderModel(LightningModule):
         # init nodes
         # self.operator_input_fc = nn.Linear(self.inputs_dim + self.subject_embeddings_dim,
         #                                    self.embeddings_dim)
-        self.operator_node = SimpleOperatorModule(self.embeddings_dim,
-                                                  self.outputs_dim)
+
         self.halt_node = HaltingModule(self.embeddings_dim,
                                        self.max_response_step)
         self.recurrence_node = RecurrenceModule(self.inputs_dim,
                                                 self.embeddings_dim,
                                                 self.n_subjects,
                                                 self.subject_embeddings_dim)
+        match operator_type.lower():
+            case 'spatiotemporal':
+                self.operator_node = SpatioTemporalOperatorModule(
+                    self.embeddings_dim, self.outputs_dim, 4, 4)
+                # FIXME use variable space-time embedding sizes
+            case _:  # simple
+                self.operator_node = SimpleOperatorModule(
+                    self.embeddings_dim, self.outputs_dim)
 
         # init embeddings
         self.embeddings = nn.Embedding(self.n_contexts,
@@ -153,7 +161,7 @@ class CogPonderModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        _, subject_ids, contexts, stimuli, y_true, rt_true, _ = batch
+        subject_ids, trial_ids, contexts, stimuli, y_true, rt_true, is_corrects = batch
 
         # FIXME this is a hack to disable contextual embedding
         contexts = torch.zeros_like(contexts)
@@ -192,7 +200,7 @@ class CogPonderModel(LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        _, subject_ids, contexts, stimuli, y_true, rt_true, _ = batch
+        subject_ids, trial_ids, contexts, stimuli, y_true, rt_true, is_corrects = batch
 
         # FIXME this is a hack to disable contextual embedding
         contexts = torch.zeros_like(contexts)

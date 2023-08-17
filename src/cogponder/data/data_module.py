@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset, Subset
 from torch.utils.data import Dataset
 import numpy as np
-from typing import Dict
+from typing import Dict, Optional
 
 
 class CogPonderDataModule(pl.LightningDataModule):
@@ -14,16 +14,20 @@ class CogPonderDataModule(pl.LightningDataModule):
         train_ratio=.75,
         batch_size=4,
         shuffle=False,
-        num_workers: int = -1
+        num_workers: int = -1,
+        dataset_name: Optional[str] = None
     ):
         super().__init__()
         self.save_hyperparameters(ignore=['datasets'], logger=False)
 
         if isinstance(datasets, TensorDataset):
             self.dataset = datasets
+        elif isinstance(datasets, dict) and len(datasets.keys()) == 1:
+            self.dataset_name, self.dataset = datasets.popitem()
         elif isinstance(datasets, dict):
+            self.datasets = datasets
             # TODO support multitask
-            pass
+            raise ValueError('Multitask datasets are not supported yet.')
 
         self.train_ratio = train_ratio
         self.batch_size = batch_size
@@ -32,6 +36,7 @@ class CogPonderDataModule(pl.LightningDataModule):
 
     def prepare_data(self):
 
+        # FIXME: index 5 is response_steps (see mappings in the dataset class)
         response_steps = self.dataset[:][5]
 
         # remove invalid trials (rt <= 0)

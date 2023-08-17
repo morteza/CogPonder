@@ -24,6 +24,17 @@ class StroopSRODataset(Dataset):
 
     """
 
+    # feature names mapping from the original dataset (value) to the tensor dataset (key)
+    mappings = {
+        'subject_ids': ['worker_id'],
+        'trial_ids': ['trial_index'],
+        'contexts': ['condition'],
+        'stimuli': ['stim_color', 'stim_word'],
+        'responses': ['key_press'],
+        'response_steps': ['response_step'],
+        'corrects': ['correct'],
+    }
+
     def __init__(
         self,
         n_subjects: int = -1,  # -1 means all
@@ -93,17 +104,11 @@ class StroopSRODataset(Dataset):
         data['response_step'] = data['rt'] // self.step_duration
         data['response_step'] = data['response_step'].apply(np.floor).astype('int')
 
-        mappings = {
-            'trial_ids': ['trial_index'],
-            'subject_ids': ['worker_id'],
-            'contexts': ['condition'],
-            'stimuli': ['stim_color', 'stim_word'],
-            'responses': ['key_press'],
-            'response_steps': ['response_step'],
-            'corrects': ['correct'],
-        }
+        preprocessed = {k: data[v].values.squeeze() for k, v in self.mappings.items()}
 
-        preprocessed = (data[v] for v in mappings.values())
+        # reshape stimuli to (trials, seq, feature)
+        stim = preprocessed['stimuli'].reshape(-1, 1, 2)
+        preprocessed['stimuli'] = stim
 
         return preprocessed
 
@@ -111,7 +116,7 @@ class StroopSRODataset(Dataset):
         """Helper to convert a preprocessed data mapping to a TensorDataset.
         """
 
-        tensors = (torch.Tensor(df.values.squeeze()) for df in preprocessed)
+        tensors = [torch.Tensor(v) for k, v in preprocessed.items()]
 
         return TensorDataset(*tensors)
 
