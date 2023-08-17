@@ -101,7 +101,7 @@ class NBackSRODataset(Dataset):
                 np.pad(x, (self.n_back, 0), 'constant', constant_values=0),
                 n_back + 1).tolist(),
         ).to_list()
-        stim = np.concatenate(stim)
+        stim = np.concatenate(stim).reshape(-1, self.n_back + 1, 1)
         preprocessed['stimuli'] = stim  # type: ignore
 
         return preprocessed

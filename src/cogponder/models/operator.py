@@ -32,20 +32,34 @@ class SpatioTemporalOperatorModule(nn.Module):
         self.time_embedding_dim = time_embedding_dim
         self.outputs_dim = outputs_dim
 
-        # define simple CNN to encode space features
+        # simple CNN to encode space features
         self.space_encoder = nn.Sequential(
             nn.Conv1d(inputs_dim, space_embedding_dim, kernel_size=3),
             nn.ReLU(),
         )
 
-        # simple LSTM to envode time features
-        self.time_encoder = nn.LSTM(inputs_dim, time_embedding_dim, batch_first=True)
+        # simple LSTM to encode time features
+        self.time_encoder = nn.LSTM(
+            space_embedding_dim,
+            time_embedding_dim, batch_first=True)
 
-    def forwad(self, x):
-        # x: (batch_size, seq_len, inputs_dim)
-        # space encoding
-        y_space = self.space_encoder(x.transpose(1, 2))
-        y_time, _ = self.time_encoder(x)
-        out = y_time[:, -1, :]
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(time_embedding_dim, outputs_dim),
+        )
 
-        return out
+    def forward(self, x):
+        # x: (batch_size, seq_len, features)
+
+        # space
+        y_space = self.space_encoder(x.transpose(1, 2))  # (batch_size, features, seq_len)
+        y_space = y_space.transpose(1, 2)  # (batch_size, seq_len, features)
+
+        # time
+        y_time, _ = self.time_encoder(y_space)  # (batch_size, seq_len, features)
+        y = y_time[:, -1, :]  # (batch_size, space_embedding_dim, time_embedding_dim)
+
+        # output
+        y = self.fc(y)
+
+        return y
