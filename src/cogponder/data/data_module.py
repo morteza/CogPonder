@@ -10,7 +10,7 @@ class CogPonderDataModule(pl.LightningDataModule):
 
     def __init__(
         self,
-        datasets: TensorDataset | Dict[str, Dataset],
+        datasets: TensorDataset | Dataset | Dict[str, Dataset],
         train_ratio=.75,
         batch_size=4,
         shuffle=False,

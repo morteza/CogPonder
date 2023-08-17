@@ -4,6 +4,7 @@ from torch.utils.data import Dataset, TensorDataset
 from typing import Union
 import numpy as np
 from .utils import remove_non_decision_time
+from numpy.lib.stride_tricks import sliding_window_view
 
 
 class NBackSRODataset(Dataset):
@@ -54,15 +55,15 @@ class NBackSRODataset(Dataset):
 
         data = data.query('worker_id in @worker_ids and '
                           'exp_stage == "adaptive" and '
-                          'load == @n_back and target.notna() and '
-                          'rt > 0 and rt < 2000').copy()
+                          'load == @n_back and target.notna()').copy()
 
         data.sort_index(inplace=True)
 
         sro_keys = {37: 'match', 40: 'non-match'}
 
         # mapping
-        data['trial_index'] = data.groupby('worker_id').cumcount()
+        data['block_index'] = data.groupby(['worker_id']).cumcount()
+        data['trial_index'] = data.groupby(['worker_id']).cumcount()
         data['is_match'] = data['stim'].str.upper() == data['target'].str.upper()  # match or not
         data['key_press'] = data['key_press'].map(sro_keys)
         data['response_step'] = data['rt'] // self.step_duration
@@ -78,13 +79,13 @@ class NBackSRODataset(Dataset):
         data['worker_id'] = data['worker_id'].cat.codes.astype('int')   # start at 0
         data['is_match'] = data['is_match'].astype('int')   # start at 0
         data['key_press'] = data['key_press'].cat.codes.astype('int')
-        data['stim'] = data['stim'].cat.codes.astype('float32')
+        data['stim'] = data['stim'].cat.codes.astype('float32') + 1  # start at 1, 0 is reserved for burn-in padding
         data['correct'] = data['correct'].astype('int')
 
         # column names mapping
         mappings = {
-            'trial_ids': ['trial_index'],
             'subject_ids': ['worker_id'],
+            'trial_ids': ['trial_index'],
             'contexts': ['is_match'],
             'stimuli': ['stim'],
             'responses': ['key_press'],
@@ -92,7 +93,16 @@ class NBackSRODataset(Dataset):
             'corrects': ['correct']
         }
 
-        preprocessed = (data[v] for v in mappings.values())
+        preprocessed = {k: data[v].values.squeeze() for k, v in mappings.items()}
+
+        # sliding window stimuli
+        stim = data.groupby(['worker_id', 'block_num'])['stim'].apply(
+            lambda x: sliding_window_view(
+                np.pad(x, (self.n_back, 0), 'constant', constant_values=0),
+                n_back + 1).tolist(),
+        ).to_list()
+        stim = np.concatenate(stim)
+        preprocessed['stimuli'] = stim  # type: ignore
 
         return preprocessed
 
@@ -100,7 +110,7 @@ class NBackSRODataset(Dataset):
         """Helper to convert a preprocessed data mapping to a TensorDataset.
         """
 
-        tensors = [torch.Tensor(df.values.squeeze()) for df in preprocessed]
-        tensors[3] = tensors[3].reshape(-1, 1)  # reshape stimuli (1 column)
+        # create a sequence of previous N stimuli
+        tensors = [torch.Tensor(v) for k, v in preprocessed.items()]
 
         return TensorDataset(*tensors)
