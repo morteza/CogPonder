@@ -157,11 +157,11 @@ class CogPonderModel(LightningModule):
         # gather response at halting time
         y_pred = torch.argmax(y_steps, dim=-1).gather(dim=0, index=halt_steps[None, :] - 1,)[0]
 
-        return y_pred, y_steps, p_steps, halt_steps
+        return y_pred, y_steps, p_steps, halt_steps.float()
 
     def training_step(self, batch, batch_idx):
 
-        subject_ids, trial_ids, contexts, stimuli, y_true, rt_true, is_corrects = batch
+        subject_ids, trial_ids, contexts, stimuli, y_human, rt_human, y_correct = batch
 
         # FIXME this is a hack to disable contextual embedding
         contexts = torch.zeros_like(contexts)
@@ -170,37 +170,29 @@ class CogPonderModel(LightningModule):
         y_pred, y_steps, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
 
         # compute losses
-        resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true.long())
-        time_loss = self.time_loss_fn(p_halts, rt_true)
+        resp_loss = self.resp_loss_fn(p_halts, y_steps, y_human.long())
+        time_loss = self.time_loss_fn(p_halts, rt_human)
         loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss
-        accuracy = metrics.accuracy(y_pred.int(), y_true.int(),
-                                    task='multiclass',
-                                    num_classes=self.outputs_dim)
-        rt_corr = metrics.pearson_corrcoef(rt_pred.float(), rt_true.float())
-        rt_r2 = metrics.r2_score(rt_pred.float(), rt_true.float())
-        # accuracy = (y_pred.int() == y_true.int()).float().mean()
-        # rt_error = F.mse_loss(rt_pred.float(), rt_true.float()).sqrt()
+
+        accuracy = metrics.accuracy(y_pred.int(), y_correct.int(),
+                                    task='multiclass', num_classes=self.outputs_dim)
+        imitation_accuracy = metrics.accuracy(y_pred.int(), y_human.int(),
+                                              task='multiclass', num_classes=self.outputs_dim)
+        rt_smape = metrics.symmetric_mean_absolute_percentage_error(rt_pred, rt_human)
 
         # log losses
         self.log('train/resp_loss', resp_loss)
         self.log('train/time_loss', time_loss)
         self.log('train/total_loss', loss)
         self.log('train/accuracy', accuracy)
-        self.log('train/rt_correlation', rt_corr)
-        self.log('train/rt_r2', rt_r2)
-
-        # compute and log accuracy (assuming binary classification)
-        # y_pred = y_steps.gather(dim=0, index=rt_pred[None, :] - 1,)[0]  # (batch_size,)
-        # accuracy = (y_pred.int() == y_true.int()).float().mean()
-        # self.log('train/accuracy', accuracy, on_epoch=True)
-        # self.train_accuracy(y_pred, y_true.int())
-        # self.log('train/accuracy', self.train_accuracy, on_epoch=True)
+        self.log('train/imitation_accuracy', imitation_accuracy)
+        self.log('train/rt_smape', rt_smape)
 
         return loss
 
     def validation_step(self, batch, batch_idx):
 
-        subject_ids, trial_ids, contexts, stimuli, y_true, rt_true, is_corrects = batch
+        subject_ids, trial_ids, contexts, stimuli, y_human, rt_human, y_correct = batch
 
         # FIXME this is a hack to disable contextual embedding
         contexts = torch.zeros_like(contexts)
@@ -209,45 +201,23 @@ class CogPonderModel(LightningModule):
         y_pred, y_steps, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
 
         # compute losses
-        resp_loss = self.resp_loss_fn(p_halts, y_steps, y_true.long())
-        time_loss = self.time_loss_fn(p_halts, rt_true)
+        resp_loss = self.resp_loss_fn(p_halts, y_steps, y_human.long())
+        time_loss = self.time_loss_fn(p_halts, rt_human)
         loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss
-        accuracy = metrics.accuracy(y_pred.int(), y_true.int(),
-                                    task='multiclass',
-                                    num_classes=self.outputs_dim)
-        rt_corr = metrics.pearson_corrcoef(rt_pred.float(), rt_true.float())
-        rt_r2 = metrics.r2_score(rt_pred.float(), rt_true.float())
-        # accuracy = (y_pred.int() == y_true.int()).float().mean()
-        # rt_error = F.mse_loss(rt_pred.float(), rt_true.float()).sqrt()
+
+        accuracy = metrics.accuracy(y_pred.int(), y_correct.int(),
+                                    task='multiclass', num_classes=self.outputs_dim)
+        imitation_accuracy = metrics.accuracy(y_pred.int(), y_human.int(),
+                                              task='multiclass', num_classes=self.outputs_dim)
+        rt_smape = metrics.symmetric_mean_absolute_percentage_error(rt_pred, rt_human)
 
         # log losses
         self.log('val/resp_loss', resp_loss)
         self.log('val/time_loss', time_loss)
         self.log('val/total_loss', loss)
         self.log('val/accuracy', accuracy)
-        self.log('val/rt_correlation', rt_corr)
-        self.log('val/rt_r2', rt_r2)
-
-        # match self.task:
-        #     case 'nback':
-        #         # compute and log accuracy (assuming binary classification)
-        #         # accuracy = (y_pred.int() == y_true.int()).float().mean()
-        #         # self.log('val/accuracy', accuracy, on_epoch=True)
-        #         # self.val_accuracy(y_pred, y_true.int())
-        #         # self.log('val/accuracy', self.val_accuracy, on_epoch=True)
-        #         pass
-        #     case 'stroop':
-        #         is_corrects_pred = (y_pred.long() == responses).float()
-        #         incong_is_corrects = torch.where(contexts == 0, is_corrects_pred, torch.nan)
-        #         cong_is_corrects = torch.where(contexts == 1, is_corrects_pred, torch.nan)
-
-        #         accuracy = torch.nanmean(is_corrects_pred)
-        #         incong_accuracy = torch.nanmean(incong_is_corrects)
-        #         cong_accuracy = torch.nanmean(cong_is_corrects)
-
-        #         self.log('val/accuracy', accuracy, on_epoch=True)
-        #         self.log('val/accuracy_congruent', cong_accuracy, on_epoch=True)
-        #         self.log('val/accuracy_incongruent', incong_accuracy, on_epoch=True)
+        self.log('val/imitation_accuracy', imitation_accuracy)
+        self.log('val/rt_smape', rt_smape)
 
         return loss
 

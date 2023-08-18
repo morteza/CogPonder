@@ -20,12 +20,13 @@ class CogPonderDataModule(pl.LightningDataModule):
         super().__init__()
         self.save_hyperparameters(ignore=['datasets'], logger=False)
 
-        if isinstance(datasets, TensorDataset):
+        self.dataset_name = dataset_name
+
+        if isinstance(datasets, Dataset):
             self.dataset = datasets
         elif isinstance(datasets, dict) and len(datasets.keys()) == 1:
             self.dataset_name, self.dataset = datasets.popitem()
         elif isinstance(datasets, dict):
-            self.datasets = datasets
             # TODO support multitask
             raise ValueError('Multitask datasets are not supported yet.')
 

@@ -9,13 +9,16 @@ https://expfactory.org/experiments/stroop/
 
 For each trial, we use the following features:
 
+### TODO: the following table needs to be updated (See StroopSRO data module)
+
 SRO Feature | Description | CogPonder Name
 ---|---|---|
-`worker_id` | the identifier of the participant. | `subject_id`
-`stim_color` | the ink color of the word (blue, green, red). | `X[0]`
-`stim_word` | the word (blue, green, red). This is the expected response. | `X[1]`
+`worker_id` | the identifier of the participant. | `subject_ids`
+`...` | the trial number. | `trial_ids`
+`stim_color` | the ink color of the word (blue, green, red). | `stimuli[...,1]`
+`stim_word` | the word (blue, green, red). This is the expected response. | `stimuli[...,1]`
 `condition` | congruent or incongruent. | `trial_types`
-`correct` | whether the response was incorrect=0 or correct=1. | `is_corrects`
+`correct` | whether the response was incorrect=0 or correct=1. | `correct_responses`
 `key_press` | response, which is expected to be the color of the word (blue=66, green=71, red=82). | `responses`
 `rt` | response time in millis. | `response_steps`
 
@@ -25,7 +28,7 @@ SRO Feature | Description | CogPonder Name
 
 > A variant of the n-back task, each trial consists of letters presented in successive order. Subjects must press a button if the current letter matches the letter that occurred n trials ago (regardless of capitalization). N varies according to a staircase tracking method that increases as subjects accurately respond and decreases as subjects make errors. https://expfactory.org/experiments/adaptive_n_back/
 
-- [] TODO: Add N-back features table
+### TODO: the following table needs to be updated (see NBackSRO data module)
 
 The SRO-2back interface provides the following features from the *Self-Regulation Ontology* study:
 

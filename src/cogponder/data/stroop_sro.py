@@ -32,7 +32,7 @@ class StroopSRODataset(Dataset):
         'stimuli': ['stim_color', 'stim_word'],
         'responses': ['key_press'],
         'response_steps': ['response_step'],
-        'corrects': ['correct'],
+        'correct_responses': ['correct_response'],
     }
 
     def __init__(
@@ -80,12 +80,16 @@ class StroopSRODataset(Dataset):
 
         # map key_press to color names
         data['key_press'] = data['key_press'].map(sro_colors)
+        data['correct_response'] = data['correct_response'].map(sro_colors)
 
+        print(data['correct'].mean())
         # set categories
         data['worker_id'] = data['worker_id'].astype('category')
         data['condition'] = data['condition'].astype('category').cat.set_categories(
             list(sro_conditions.keys()), ordered=True)
         data['key_press'] = data['key_press'].astype('category').cat.set_categories(
+            list(sro_colors.values()), ordered=True)
+        data['correct_response'] = data['correct_response'].astype('category').cat.set_categories(
             list(sro_colors.values()), ordered=True)
         data['stim_color'] = data['stim_color'].astype('category').cat.set_categories(
             list(sro_colors.values()), ordered=True)
@@ -96,9 +100,9 @@ class StroopSRODataset(Dataset):
         data['worker_id'] = data['worker_id'].cat.codes.astype('int')   # start at 0
         data['condition'] = data['condition'].cat.codes.astype('int')   # start at 0
         data['key_press'] = data['key_press'].cat.codes.astype('int')
+        data['correct_response'] = data['correct_response'].cat.codes.astype('int')
         data['stim_color'] = data['stim_color'].cat.codes.astype('float32')
         data['stim_word'] = data['stim_word'].cat.codes.astype('float32')
-        data['correct'] = data['correct'].astype('int')
 
         # compute response steps
         data['response_step'] = data['rt'] // self.step_duration

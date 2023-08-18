@@ -25,7 +25,7 @@ class NBackSRODataset(Dataset):
         'stimuli': ['stim'],
         'responses': ['key_press'],
         'response_steps': ['response_step'],
-        'corrects': ['correct']
+        'correct_responses': ['correct_response']
     }
 
     def __init__(
@@ -77,6 +77,7 @@ class NBackSRODataset(Dataset):
         data['trial_index'] = data.groupby(['worker_id']).cumcount()
         data['is_match'] = data['stim'].str.upper() == data['target'].str.upper()  # match or not
         data['key_press'] = data['key_press'].map(sro_keys)
+        data['correct_response'] = data['correct_response'].map(sro_keys)
         data['response_step'] = data['rt'] // self.step_duration
         data['response_step'] = data['response_step'].apply(np.floor).astype('int')
 
@@ -84,14 +85,16 @@ class NBackSRODataset(Dataset):
         data['worker_id'] = data['worker_id'].astype('category')
         data['key_press'] = data['key_press'].astype('category').cat.set_categories(
             list(sro_keys.values()), ordered=True)
+        data['correct_response'] = data['correct_response'].astype('category').cat.set_categories(
+            list(sro_keys.values()), ordered=True)
         data['stim'] = data['stim'].str.upper().astype('category')
 
         # encode categorical variables
         data['worker_id'] = data['worker_id'].cat.codes.astype('int')   # start at 0
         data['is_match'] = data['is_match'].astype('int')   # start at 0
         data['key_press'] = data['key_press'].cat.codes.astype('int')
+        data['correct_response'] = data['correct_response'].cat.codes.astype('int')
         data['stim'] = data['stim'].cat.codes.astype('float32') + 1  # start at 1, 0 is reserved for burn-in padding
-        data['correct'] = data['correct'].astype('int')
 
         preprocessed = {k: data[v].values.squeeze() for k, v in self.mappings.items()}
 
