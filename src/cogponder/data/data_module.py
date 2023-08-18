@@ -35,7 +35,7 @@ class CogPonderDataModule(pl.LightningDataModule):
         self.shuffle = shuffle
         self.num_workers = num_workers
 
-    def prepare_data(self, remove_invalid_trials=False):
+    def prepare_data(self, remove_invalid_trials=True):
 
         if remove_invalid_trials:
             # FIXME index 5 is response_steps (see mappings in the dataset class)

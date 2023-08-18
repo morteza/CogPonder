@@ -41,7 +41,9 @@ class RecurrenceModule(nn.Module):
         subject_features = subject_features.unsqueeze(1).repeat(1, n_timepoints, 1)
         x = torch.cat([x, subject_features], dim=-1)
 
-        out, _ = self.model(x, h.unsqueeze(0))
-        out = out[:, -1, :]
+        h = h[:, -1, :].unsqueeze(0)
+        h, _ = self.model(x, h)
+        h = h.squeeze(0)
 
-        return out
+        return h
+

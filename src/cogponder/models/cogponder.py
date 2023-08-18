@@ -107,10 +107,10 @@ class CogPonderModel(LightningModule):
         """
 
         context_ids = context_ids.int()
-        batch_size = x.size(0)
+        batch_size, seq_len, n_features = x.shape
 
-        # init parameters
-        h = self.embeddings(context_ids)
+        # init embedding, h: (batch_size, seq_len, n_features)
+        h = self.embeddings(context_ids).unsqueeze(1).repeat(1, seq_len, 1)
 
         p_continue = torch.ones(batch_size, device=self.device)
         halt_steps = torch.zeros(batch_size, dtype=torch.long, device=self.device)
@@ -123,6 +123,7 @@ class CogPonderModel(LightningModule):
             # 1. operate
 
             y_step = self.operator_node(h)
+
             y_list.append(y_step)
 
             # 2. calculate halting probability

@@ -34,7 +34,7 @@ class SpatioTemporalOperatorModule(nn.Module):
 
         # simple CNN to encode space features
         self.space_encoder = nn.Sequential(
-            nn.Conv1d(inputs_dim, space_embedding_dim, kernel_size=3),
+            nn.Conv1d(inputs_dim, space_embedding_dim, kernel_size=1),
             nn.ReLU(),
         )
 
@@ -50,6 +50,8 @@ class SpatioTemporalOperatorModule(nn.Module):
 
     def forward(self, x):
         # x: (batch_size, seq_len, features)
+
+        batch_size, seq_len, n_features = x.shape
 
         # space
         y_space = self.space_encoder(x.transpose(1, 2))  # (batch_size, features, seq_len)
