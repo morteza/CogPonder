@@ -14,7 +14,7 @@ mamba activate cogponder
 dvc update --rev master -R data  # import the SRO data using DVC
 ```
 
-To install additional GPU dependencies use the following:
+To install additional GPU dependencies run the following:
 
 ```bash
 mamba env update -f environment_gpu.yml --prune
@@ -24,9 +24,8 @@ mamba env update -f environment_gpu.yml --prune
 
 The notebooks are organized as follows:
 
-- `notebooks/1 N-Back.ipynb`: Running the agent on the 2-back test using some manual choices of hyperparameters.
-- `notebooks/2 Stroop.ipynb`: Running the agent on the Stroop test using some manual choices of hyperparameters.
-- `notebooks/Hyperparameter Tuning.ipynb`: Uses Ray Tune to optimize the hyperparameters.
+- `notebooks/N-Back.ipynb`: Running a single-task agent on the 2-back test using arbitrary hyperparameters.
+- `notebooks/Stroop.ipynb`: Running a single-task agent on the Stroop test using arbitrary hyperparameters.
 
 ## Data
 
