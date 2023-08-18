@@ -57,7 +57,7 @@ class SpatioTemporalOperatorModule(nn.Module):
 
         # time
         y_time, _ = self.time_encoder(y_space)  # (batch_size, seq_len, features)
-        y = y_time[:, -1, :]  # (batch_size, space_embedding_dim, time_embedding_dim)
+        y = y_time[:, -1, :]  # (batch_size, time_embedding_dim, space_embedding_dim)
 
         # output
         y = self.fc(y)
