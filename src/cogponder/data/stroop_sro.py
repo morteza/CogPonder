@@ -82,7 +82,6 @@ class StroopSRODataset(Dataset):
         data['key_press'] = data['key_press'].map(sro_colors)
         data['correct_response'] = data['correct_response'].map(sro_colors)
 
-        print(data['correct'].mean())
         # set categories
         data['worker_id'] = data['worker_id'].astype('category')
         data['condition'] = data['condition'].astype('category').cat.set_categories(

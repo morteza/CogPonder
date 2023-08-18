@@ -35,16 +35,17 @@ class CogPonderDataModule(pl.LightningDataModule):
         self.shuffle = shuffle
         self.num_workers = num_workers
 
-    def prepare_data(self):
+    def prepare_data(self, remove_invalid_trials=False):
 
-        # FIXME: index 5 is response_steps (see mappings in the dataset class)
-        response_steps = self.dataset[:][5]
+        if remove_invalid_trials:
+            # FIXME index 5 is response_steps (see mappings in the dataset class)
+            response_steps = self.dataset[:][5]
 
-        # remove invalid trials (rt <= 0)
-        valid_trials = (response_steps > 0)
-        self.dataset = TensorDataset(*self.dataset[valid_trials])
+            # remove timeout trials (rt <= 0)
+            valid_trials = (response_steps > 0)
+            self.dataset = TensorDataset(*self.dataset[valid_trials])
 
-        trial_ids = self.dataset[:][0]
+        trial_ids = self.dataset[:][1]  # FIXME index-1 is trial_id
         n_trials = torch.unique(trial_ids).shape[0]
 
         # test/train split (FIXME: should it pick the first n trials, not trial 1..n)
