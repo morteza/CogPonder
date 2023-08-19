@@ -17,11 +17,11 @@ class HaltingModule(nn.Module):
 
     def forward(self, h, step):
 
-        batch_size = h.size(0)
+        batch_size = h.squeeze(0).size(0)
 
         if step == self.max_response_step:
             lambda_n = torch.ones((batch_size,))
         else:
-            lambda_n = self.model(h.squeeze(1))[:, 0]
+            lambda_n = self.model(h.squeeze(0))[:, 0]
 
         return lambda_n

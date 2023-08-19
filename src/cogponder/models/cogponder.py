@@ -8,7 +8,7 @@ import torchmetrics.functional as metrics
 
 from .halting import HaltingModule
 from .operator import SimpleOperatorModule, SpatioTemporalOperatorModule
-from .recurrence import RecurrenceModule
+from .iterator import IteratorModule
 
 
 class CogPonderModel(LightningModule):
@@ -70,14 +70,14 @@ class CogPonderModel(LightningModule):
 
         self.halt_node = HaltingModule(self.embeddings_dim,
                                        self.max_response_step)
-        self.recurrence_node = RecurrenceModule(self.inputs_dim,
-                                                self.embeddings_dim,
-                                                self.n_subjects,
-                                                self.subject_embeddings_dim)
+        self.iterator_node = IteratorModule(self.inputs_dim,
+                                            self.embeddings_dim,
+                                            self.n_subjects,
+                                            self.subject_embeddings_dim)
         match operator_type.lower():
             case 'spatiotemporal':
                 self.operator_node = SpatioTemporalOperatorModule(
-                    self.embeddings_dim, self.outputs_dim, 4, 4)
+                    self.inputs_dim, self.outputs_dim, 4, self.embeddings_dim)
                 # FIXME use variable space-time embedding sizes
             case _:  # simple
                 self.operator_node = SimpleOperatorModule(
@@ -109,8 +109,8 @@ class CogPonderModel(LightningModule):
         context_ids = context_ids.int()
         batch_size, seq_len, n_features = x.shape
 
-        # init embedding, h: (batch_size, seq_len, n_features)
-        h = self.embeddings(context_ids).unsqueeze(1).repeat(1, seq_len, 1)
+        # init embedding, h: (batch_size, embeddings_dim)
+        h = self.embeddings(context_ids)
 
         p_continue = torch.ones(batch_size, device=self.device)
         halt_steps = torch.zeros(batch_size, dtype=torch.long, device=self.device)
@@ -120,25 +120,18 @@ class CogPonderModel(LightningModule):
         # main loop
         for n in range(1, self.max_response_step + 1):
 
-            # 1. operate
-
-            y_step = self.operator_node(h)
+            # 1. operate, test, iterate
+            y_step = self.operator_node(x, h)
+            lambda_n = self.halt_node(h, step=n)
+            h = self.iterator_node(x, h, subject_ids)
 
             y_list.append(y_step)
-
-            # 2. calculate halting probability
-
-            lambda_n = self.halt_node(h, n).to(self.device)
-
             p_list.append(p_continue * lambda_n)
             p_continue = p_continue * (1 - lambda_n)
             halt_steps = torch.max(
                 halt_steps,
                 ((halt_steps == 0) * n * torch.bernoulli(lambda_n)).to(torch.long)
             )
-
-            # 3. loop
-            h = self.recurrence_node(x, h, subject_ids)
 
             # 4. stop if all the samples have halted
             # IGNORE: enable for debugging or stopping the recurrent loop upon halt.
