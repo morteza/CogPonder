@@ -36,7 +36,7 @@ class StroopSRODataset(Dataset):
     }
 
     sro_conditions = {'incongruent': 0, 'congruent': 1}
-    sro_colors = {66: 'blue', 71: 'green', 82: 'red', -1: 'timeout'}
+    sro_colors = {66: 'blue', 71: 'green', 82: 'red'}
 
     def __init__(
         self,
@@ -99,13 +99,14 @@ class StroopSRODataset(Dataset):
         data['worker_id'] = data['worker_id'].astype('category')
         data['condition'] = data['condition'].astype('category').cat.set_categories(
             list(self.sro_conditions.keys()), ordered=True)
-        data['key_press'] = data['key_press'].astype('category').cat.set_categories(
-            list(self.sro_colors.values()), ordered=True)
-        data['correct_response'] = data['correct_response'].astype('category').cat.set_categories(
-            list(self.sro_colors.values()), ordered=True)
         data['stim_color'] = data['stim_color'].astype('category').cat.set_categories(
             list(self.sro_colors.values()), ordered=True)
         data['stim_word'] = data['stim_word'].astype('category').cat.set_categories(
+            list(self.sro_colors.values()), ordered=True)
+        
+        data['key_press'] = data['key_press'].astype('category').cat.set_categories(
+            list(self.sro_colors.values()), ordered=True)
+        data['correct_response'] = data['correct_response'].astype('category').cat.set_categories(
             list(self.sro_colors.values()), ordered=True)
 
         # compute response steps
@@ -122,6 +123,8 @@ class StroopSRODataset(Dataset):
         data['worker_id'] = data['worker_id'].cat.codes.astype('int')   # start at 0
         data['condition'] = data['condition'].cat.codes.astype('int')   # start at 0
 
+        # drop timeout trials
+        data = data.dropna(subset=['key_press'])
         data[['correct_response', 'key_press']] = data[['correct_response', 'key_press']].apply(
             lambda x: x.cat.codes.astype('int'))
         data['stim_color'] = data['stim_color'].cat.codes.astype('float32')

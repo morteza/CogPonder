@@ -164,10 +164,6 @@ class CogPonderModel(LightningModule):
 
         subject_ids, trial_ids, contexts, X, y_human, rt_human, y_correct = batch
 
-        # FIXME this is a hack to disable contextual embedding
-        y_human = y_human - 1.0 
-        # contexts = torch.zeros_like(contexts)
-
         # forward pass
         y_pred, contexts_pred, y_steps, p_halts, rt_pred = self.forward(X, subject_ids)
 
