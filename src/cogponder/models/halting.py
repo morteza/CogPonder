@@ -20,7 +20,7 @@ class HaltingModule(nn.Module):
         batch_size = h.squeeze(0).size(0)
 
         if step == self.max_response_step:
-            lambda_n = torch.ones((batch_size,))
+            lambda_n = torch.ones((batch_size,), device=h.device)
         else:
             lambda_n = self.model(h.squeeze(0))[:, 0]
 
