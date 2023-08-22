@@ -84,15 +84,22 @@ class CogPonderModel(LightningModule):
                     self.embeddings_dim, self.outputs_dim)
 
         # init embeddings
-        self.embeddings = nn.Embedding(self.n_contexts,
+        self.embeddings = nn.Embedding(self.n_subjects or 1,
                                        self.embeddings_dim,
                                        dtype=torch.float)
+
+        # predict contexts
+        self.context_node = nn.Sequential(
+            nn.Linear(self.embeddings_dim, self.embeddings_dim),
+            nn.ReLU(),
+            nn.Linear(self.embeddings_dim, self.n_contexts)
+        )
 
         # init losses
         self.resp_loss_fn = ResponseLoss()
         self.time_loss_fn = ResponseTimeLoss(self.max_response_step)
 
-    def forward(self, x, subject_ids, context_ids):
+    def forward(self, x, subject_ids):
 
         """CogPonder forward pass
 
@@ -106,11 +113,10 @@ class CogPonderModel(LightningModule):
             (y_steps, p_steps, halt_steps)
         """
 
-        context_ids = context_ids.int()
         batch_size, seq_len, n_features = x.shape
 
         # init embedding, h: (batch_size, embeddings_dim)
-        h = self.embeddings(context_ids)
+        h = self.embeddings(subject_ids.int())
 
         p_continue = torch.ones(batch_size, device=self.device)
         halt_steps = torch.zeros(batch_size, dtype=torch.long, device=self.device)
@@ -150,23 +156,26 @@ class CogPonderModel(LightningModule):
 
         # gather response at halting time
         y_pred = torch.argmax(y_steps, dim=-1).gather(dim=0, index=halt_steps[None, :] - 1,)[0]
+        contexts = self.context_node(h)
 
-        return y_pred, y_steps, p_steps, halt_steps.float()
+        return y_pred, contexts, y_steps, p_steps, halt_steps.float()
 
     def training_step(self, batch, batch_idx):
 
-        subject_ids, trial_ids, contexts, stimuli, y_human, rt_human, y_correct = batch
+        subject_ids, trial_ids, contexts, X, y_human, rt_human, y_correct = batch
 
         # FIXME this is a hack to disable contextual embedding
+        y_human = y_human - 1.0 
         # contexts = torch.zeros_like(contexts)
 
         # forward pass
-        y_pred, y_steps, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
+        y_pred, contexts_pred, y_steps, p_halts, rt_pred = self.forward(X, subject_ids)
 
         # compute losses
+        ctxt_loss = F.cross_entropy(contexts_pred, contexts.long())
         resp_loss = self.resp_loss_fn(p_halts, y_steps, y_human.long())
         time_loss = self.time_loss_fn(p_halts, rt_human)
-        loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss
+        loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss + ctxt_loss
 
         accuracy = metrics.accuracy(y_pred.int(), y_correct.int(),
                                     task='multiclass', num_classes=self.outputs_dim)
@@ -175,6 +184,7 @@ class CogPonderModel(LightningModule):
         rt_smape = metrics.symmetric_mean_absolute_percentage_error(rt_pred, rt_human)
 
         # log losses
+        self.log('train/context_loss', ctxt_loss)
         self.log('train/resp_loss', resp_loss)
         self.log('train/time_loss', time_loss)
         self.log('train/total_loss', loss)
@@ -186,18 +196,16 @@ class CogPonderModel(LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        subject_ids, trial_ids, contexts, stimuli, y_human, rt_human, y_correct = batch
-
-        # FIXME this is a hack to disable contextual embedding
-        # contexts = torch.zeros_like(contexts)
+        subject_ids, trial_ids, contexts, X, y_human, rt_human, y_correct = batch
 
         # forward pass
-        y_pred, y_steps, p_halts, rt_pred = self.forward(stimuli, subject_ids, contexts)
+        y_pred, contexts_pred, y_steps, p_halts, rt_pred = self.forward(X, subject_ids)
 
         # compute losses
+        ctxt_loss = F.cross_entropy(contexts_pred, contexts.long())
         resp_loss = self.resp_loss_fn(p_halts, y_steps, y_human.long())
         time_loss = self.time_loss_fn(p_halts, rt_human)
-        loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss
+        loss = self.response_loss_beta * resp_loss + self.time_loss_beta * time_loss + ctxt_loss
 
         accuracy = metrics.accuracy(y_pred.int(), y_correct.int(),
                                     task='multiclass', num_classes=self.outputs_dim)
@@ -206,6 +214,7 @@ class CogPonderModel(LightningModule):
         rt_smape = metrics.symmetric_mean_absolute_percentage_error(rt_pred, rt_human)
 
         # log losses
+        self.log('val/context_loss', ctxt_loss)
         self.log('val/resp_loss', resp_loss)
         self.log('val/time_loss', time_loss)
         self.log('val/total_loss', loss)

@@ -45,7 +45,7 @@ class CogPonderDataModule(pl.LightningDataModule):
             valid_trials = (response_steps > 0)
             self.dataset = TensorDataset(*self.dataset[valid_trials])
 
-        trial_ids = self.dataset[:][1]  # FIXME index-1 is trial_id
+        trial_ids = self.dataset[:][1]  # index=1 is trial_id
         n_trials = torch.unique(trial_ids).shape[0]
 
         # test/train split (FIXME: should it pick the first n trials, not trial 1..n)

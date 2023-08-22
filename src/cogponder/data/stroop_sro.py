@@ -29,14 +29,14 @@ class StroopSRODataset(Dataset):
         'subject_ids': ['worker_id'],
         'trial_ids': ['trial_index'],
         'contexts': ['condition'],
-        'stimuli': ['stim_color', 'stim_word'],
-        'responses': ['key_press'],
+        'inputs': ['stim_color', 'stim_word'],
+        'outputs': ['key_press'],
         'response_steps': ['response_step'],
-        'correct_responses': ['correct_response'],
+        'correct_outputs': ['correct_response'],
     }
 
     sro_conditions = {'incongruent': 0, 'congruent': 1}
-    sro_colors = {-1: 'timeout', 66: 'blue', 71: 'green', 82: 'red'}
+    sro_colors = {66: 'blue', 71: 'green', 82: 'red', -1: 'timeout'}
 
     def __init__(
         self,
@@ -71,6 +71,7 @@ class StroopSRODataset(Dataset):
     def inverse_transform_context(self, contexts):
         """Inverse transform context values to original labels.
         """
+
         inv_map = {v: k for k, v in self.sro_conditions.items()}
         return [inv_map[int(c)] for c in contexts]
 
@@ -120,16 +121,16 @@ class StroopSRODataset(Dataset):
         # encode categorical variables
         data['worker_id'] = data['worker_id'].cat.codes.astype('int')   # start at 0
         data['condition'] = data['condition'].cat.codes.astype('int')   # start at 0
-        data['key_press'] = data['key_press'].cat.codes.astype('int')
-        data['correct_response'] = data['correct_response'].cat.codes.astype('int')
+
+        data[['correct_response', 'key_press']] = data[['correct_response', 'key_press']].apply(
+            lambda x: x.cat.codes.astype('int'))
         data['stim_color'] = data['stim_color'].cat.codes.astype('float32')
         data['stim_word'] = data['stim_word'].cat.codes.astype('float32')
 
         preprocessed = {k: data[v].values.squeeze() for k, v in self.mappings.items()}
 
         # reshape stimuli to (trials, seq, feature)
-        stim = preprocessed['stimuli'].reshape(-1, 1, 2)
-        preprocessed['stimuli'] = stim
+        preprocessed['inputs'] = preprocessed['inputs'].reshape(-1, 1, 2)
 
         tensors = [torch.Tensor(v) for k, v in preprocessed.items()]
 
@@ -141,6 +142,3 @@ class StroopSRODataset(Dataset):
         #     data['rt'] = data.groupby(['worker_id'])['rt'].transform(remove_non_decision_time,
         #                                                              response_step_interval=self.response_step_interval)
         # data['response_step'] = (data['rt'] / self.response_step_interval).apply(np.round)
-
-        # discard trials with invalid targets, e.g., burn-in trials
-        # data = data.query('key_press.notna() and rt>=0').copy()
