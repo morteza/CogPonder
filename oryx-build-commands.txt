@@ -1,2 +1,2 @@
 PlatformWithVersion=Python 
-BuildCommands=conda env create --file environment.yml --prefix ./venv --quiet
+BuildCommands=conda install -c conda-forge mamba -y && mamba init && mamba env create -f environment.yml && mamba activate cogponder
