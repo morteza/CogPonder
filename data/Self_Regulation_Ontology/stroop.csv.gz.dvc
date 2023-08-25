@@ -2,7 +2,7 @@ frozen: true
 deps:
 - path: Data/Complete_02-16-2019/Individual_Measures/stroop.csv.gz
   repo:
-    url: git@github.com:poldrack/Self_Regulation_Ontology.git
+    url: https://github.com/poldrack/Self_Regulation_Ontology.git
     rev_lock: 888e20aeddd6985546b69b49162e34ebda1a62d4
 outs:
 - path: stroop.csv.gz
