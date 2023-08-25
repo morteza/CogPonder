@@ -1,6 +1,9 @@
 # CogPonder
 
-An Interoperable Multitask Model of Response Times in Cognitive Tests
+> [!WARNING]
+> This is a work-in-progress. Model architecture and results are subject to change as we continue to develop and refine the model.
+
+An interoperable multitask model of response times in cognitive tests
 
 
 ## Setup
@@ -24,22 +27,10 @@ mamba env update -f environment_gpu.yml --prune
 
 The notebooks are organized as follows:
 
-- `notebooks/N-Back.ipynb`: Running a single-task agent on the 2-back test using arbitrary hyperparameters.
-- `notebooks/Stroop.ipynb`: Running a single-task agent on the Stroop test using arbitrary hyperparameters.
+- `notebooks/N-Back.ipynb`: training a single-task 2-back agent.
+- `notebooks/Stroop.ipynb`: training a single-task Stroop agent.
 
 ## Data
 
-### N-Back
+see [data/Self_Regulation_Ontology/README.md](data/Self_Regulation_Ontology/README.md)
 
-See the [adaptive N-back task data description](data/Self_Regulation_Ontology/README.md#adaptive-n-back).
-
-
-### Stroop
-
-See the [Stroop task data description](data/Self_Regulation_Ontology/README.md#stroop-task).
-
-## Acknowledgements
-TODO
-
-## License
-TODO
