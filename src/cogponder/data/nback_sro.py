@@ -58,6 +58,13 @@ class NBackSRODataset(Dataset):
 
         return items
 
+    def inverse_transform_context(self, contexts):
+        """Inverse transform context values to original labels (match vs non-match).
+        """
+
+        ctx_labels = ['match' if bool(c) else 'non-match' for c in contexts]
+        return ctx_labels
+
     def preprocess(self, n_back):
 
         data = pd.read_csv(self.data_path, index_col=0)
