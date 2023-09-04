@@ -3,7 +3,11 @@
 > [!WARNING]
 > This is a work-in-progress. Model architecture and results are subject to change as we continue to develop and refine the model.
 
-An interoperable multitask model of response times in cognitive tests
+CogPonder is a flexible, differentiable model of cognitive control that is inspired by the Test-Operate-Test-Exit (TOTE) architecture in psychology and the PonderNet framework in deep learning. CogPonder functionally decouples the act of control from the controlled processes by introducing a controller that wraps around any end-to-end deep learning model and decides when to terminate processing and output a response, thus producing both a response and response time.
+
+
+[CogPonder: Towards a Computational Framework of General Cognitive Control
+](https://2023.ccneuro.org/proceedings/0001148.pdf)
 
 
 ## Setup
