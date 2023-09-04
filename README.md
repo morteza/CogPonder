@@ -1,14 +1,13 @@
 # CogPonder
 
-> [!WARNING]
-> This is a work-in-progress. Model architecture and results are subject to change as we continue to develop and refine the model.
-
 CogPonder is a flexible, differentiable model of cognitive control that is inspired by the Test-Operate-Test-Exit (TOTE) architecture in psychology and the PonderNet framework in deep learning. CogPonder functionally decouples the act of control from the controlled processes by introducing a controller that wraps around any end-to-end deep learning model and decides when to terminate processing and output a response, thus producing both a response and response time.
 
 
-[CogPonder: Towards a Computational Framework of General Cognitive Control
-](https://2023.ccneuro.org/proceedings/0001148.pdf)
+[CCN2023 Paper](https://2023.ccneuro.org/proceedings/0001148.pdf) **·**
+[CCN2023 Poster](https://github.com/morteza/CogPonder/blob/2e64c71df8c662e75dafe91a1bc2f0870faadc88/docs/CogPonder%20CCN2023%20Poster.pdf)
 
+> [!WARNING]
+> This is a work-in-progress. Model architecture and results are subject to change as we continue to develop and refine the model.
 
 ## Setup
 
@@ -38,3 +37,14 @@ The notebooks are organized as follows:
 
 see [data/Self_Regulation_Ontology/README.md](data/Self_Regulation_Ontology/README.md)
 
+
+## Citation
+```bibtex
+@Conference{ansarinia2023cogponder,
+  title={CogPonder: Towards a Computational Framework of General Cognitive Control},
+  author={Ansarinia, Morteza and Cardoso-Leite, Pedro},
+  year={2023},
+  month={August},
+  booktitle={2023 Conference on Cognitive Computational Neuroscience, Oxford, UK}
+}
+```
