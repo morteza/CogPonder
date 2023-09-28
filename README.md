@@ -45,6 +45,7 @@ see [data/Self_Regulation_Ontology/README.md](data/Self_Regulation_Ontology/READ
   author={Ansarinia, Morteza and Cardoso-Leite, Pedro},
   year={2023},
   month={August},
+  doi={10.32470/CCN.2023.1697-0},
   booktitle={2023 Conference on Cognitive Computational Neuroscience, Oxford, UK}
 }
 ```
